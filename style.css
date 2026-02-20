@@ -1,8 +1,8 @@
 :root {
-    --bg: #f3f4f6;
+    --bg: #f8f4ef;
     --card: #ffffff;
-    --primary: #2563eb;
-    --done: #9ca3af;
+    --primary: #c2410c;
+    --done: #6d28d9;
 }
 
 /* Grundlayout */
@@ -38,7 +38,7 @@ body {
 header {
     background:
         radial-gradient(120% 160% at 15% -20%, rgba(255,255,255,0.28), transparent 46%),
-        linear-gradient(140deg, #1d4ed8 0%, #2563eb 45%, #0ea5e9 100%);
+        linear-gradient(140deg, #7c2d12 0%, #c2410c 46%, #ea580c 100%);
     padding: 16px 14px;
     text-align: center;
     font-size: clamp(26px, 6vw, 32px);
@@ -50,7 +50,7 @@ header {
     text-shadow: 0 3px 12px rgba(15, 23, 42, 0.24);
     box-shadow:
         inset 0 -1px 0 rgba(255,255,255,0.22),
-        0 8px 18px rgba(30, 64, 175, 0.2);
+        0 8px 18px rgba(124, 45, 18, 0.22);
 }
 
 .auth-bar {
@@ -90,7 +90,7 @@ header {
     font-size: 12px;
     font-weight: 700;
     border: none;
-    background: #2563eb;
+    background: #c2410c;
     color: white;
 }
 
@@ -250,8 +250,8 @@ button:disabled {
 }
 
 .photo-button {
-    background: #e0f2fe;
-    color: #075985;
+    background: #ffedd5;
+    color: #9a3412;
     font-size: 13px;
     font-weight: 700;
     grid-area: photo;
@@ -267,8 +267,8 @@ button:disabled {
 }
 
 .mic-button {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #ffe4e6;
+    color: #9f1239;
     font-size: 17px;
     grid-area: mic;
 }
@@ -347,7 +347,7 @@ button:disabled {
 }
 
 .sync-status.ok {
-    color: #166534;
+    color: #6d28d9;
 }
 
 .sync-status.warn {
@@ -450,8 +450,8 @@ body.modus-erledigt .input-section {
     padding: 6px 10px;
     border-radius: 10px;
     border: 1px solid #cbd5e1;
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: #fff7ed;
+    color: #9a3412;
     font-size: 13px;
     font-weight: 700;
 }
@@ -607,21 +607,21 @@ nav button::before {
 }
 
 #btnErledigt::before {
-    content: "🛒";
+    content: "🧠";
 }
 
 #btnErfassen.active {
-    background: #1d4ed8;
-    color: #eff6ff;
-    border-color: #1e40af;
-    box-shadow: 0 6px 14px rgba(29, 78, 216, 0.28);
+    background: #c2410c;
+    color: #fff7ed;
+    border-color: #9a3412;
+    box-shadow: 0 6px 14px rgba(194, 65, 12, 0.28);
 }
 
 #btnErledigt.active {
-    background: #047857;
-    color: #ecfdf5;
-    border-color: #065f46;
-    box-shadow: 0 6px 14px rgba(4, 120, 87, 0.26);
+    background: #6d28d9;
+    color: #f5f3ff;
+    border-color: #5b21b6;
+    box-shadow: 0 6px 14px rgba(109, 40, 217, 0.26);
 }
 
 nav button:not(.active) {
@@ -632,7 +632,7 @@ nav button:not(.active) {
 #splash {
     position: fixed;
     inset: 0;
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    background: linear-gradient(135deg, #9a3412, #c2410c);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -698,9 +698,9 @@ nav button:not(.active) {
 /* Dark Mode */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #1f2937;
-        --card: #374151;
-        --primary: #3b82f6;
+        --bg: #2b1d18;
+        --card: #3c2a23;
+        --primary: #ea580c;
         --done: #9ca3af;
     }
 
@@ -721,8 +721,8 @@ nav button:not(.active) {
     }
 
     .mic-button {
-        background: #1e3a8a;
-        color: #dbeafe;
+        background: #4c0519;
+        color: #ffe4e6;
     }
 
     .mic-button.listening {
@@ -749,7 +749,7 @@ nav button:not(.active) {
     }
 
     header {
-        background: #111827;
+        background: #3b1f14;
     }
 }
 
