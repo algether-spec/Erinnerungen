@@ -371,6 +371,12 @@ body.modus-erledigt .input-section {
     display: none !important;
 }
 
+/* Erledigt-Modus: Sync-Code-Leiste ausblenden */
+body.modus-erledigt .sync-code-compact,
+body.modus-erledigt .auth-bar {
+    display: none !important;
+}
+
 /* Liste */
 #liste {
     list-style: none;
