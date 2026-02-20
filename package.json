@@ -1,7 +1,7 @@
 {
   "name": "erinnerungen-v1",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Offline-faehige Erinnerungen als Progressive Web App",
   "scripts": {
     "check:syntax": "node --check app.js && node --check service-worker.js",
