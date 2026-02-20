@@ -50,7 +50,7 @@ const helpViewer = document.getElementById("help-viewer");
 const btnHelpViewerClose = document.getElementById("btn-help-viewer-close");
 
 let modus = "erfassen";
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
 const SpeechRecognitionCtor =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 const APP_CONFIG = window.APP_CONFIG || {};
@@ -513,11 +513,54 @@ function getSyncErrorHint(err) {
     return "Sync-Fehler: " + raw.slice(0, 120);
 }
 
+function reloadWithCacheBust() {
+    const url = new URL(location.href);
+    url.searchParams.set("u", String(Date.now()));
+    location.replace(url.toString());
+}
+
+function waitForControllerChange(timeoutMs = 4500) {
+    return new Promise(resolve => {
+        let finished = false;
+        const done = value => {
+            if (finished) return;
+            finished = true;
+            navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+            clearTimeout(timer);
+            resolve(value);
+        };
+        const onControllerChange = () => done(true);
+        const timer = setTimeout(() => done(false), timeoutMs);
+        navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    });
+}
+
+async function activateWaitingServiceWorker(registration) {
+    if (!registration?.waiting) return false;
+    const changedPromise = waitForControllerChange();
+    registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    return changedPromise;
+}
+
 async function forceAppUpdate() {
     if (btnForceUpdate) btnForceUpdate.disabled = true;
-    setSyncStatus("Update: komplette Neuinstallation...", "warn");
+    setSyncStatus("Update: wird angewendet...", "warn");
 
     try {
+        if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+
+            for (const registration of registrations) {
+                await registration.update();
+                if (await activateWaitingServiceWorker(registration)) {
+                    setSyncStatus("Update: aktiv", "ok");
+                    reloadWithCacheBust();
+                    return;
+                }
+            }
+        }
+
+        setSyncStatus("Update: komplette Neuinstallation...", "warn");
         if ("caches" in window) {
             const keys = await caches.keys();
             await Promise.all(
@@ -535,9 +578,7 @@ async function forceAppUpdate() {
         // Kleine Pause, damit SW-Abmeldung und Cache-Loeschung sicher wirksam sind.
         await new Promise(resolve => setTimeout(resolve, 180));
 
-        const url = new URL(location.href);
-        url.searchParams.set("u", String(Date.now()));
-        location.replace(url.toString());
+        reloadWithCacheBust();
     } catch (err) {
         console.warn("Update fehlgeschlagen:", err);
         setSyncStatus("Update fehlgeschlagen", "offline");

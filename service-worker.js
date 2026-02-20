@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.1";
+const CACHE_VERSION = "v1.0.2";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 const FILES_TO_CACHE = [
@@ -7,10 +7,9 @@ const FILES_TO_CACHE = [
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./icon-cart-192.png",
-  "./icon-cart-512.png",
-  "./icon-cart-maskable-512.png",
-  "./apple-touch-icon-180.png"
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable.png"
 ];
 
 /* INSTALL */
