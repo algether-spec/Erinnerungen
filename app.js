@@ -55,11 +55,9 @@ const SpeechRecognitionCtor =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 const APP_CONFIG = window.APP_CONFIG || {};
 const STORAGE_KEY = "erinnerungen";
-const LEGACY_STORAGE_KEY = "einkaufsliste";
-const SUPABASE_TABLE = "shopping_items";
+const SUPABASE_TABLE = "reminder_items";
 const SUPABASE_CODES_TABLE = "sync_codes";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
-const LEGACY_SYNC_CODE_KEY = "einkaufsliste-sync-code";
 const IMAGE_ENTRY_PREFIX = "__IMG__:";
 const SYNC_CODE_LENGTH = 4;
 const RESERVED_SYNC_CODE = "0000";
@@ -116,22 +114,6 @@ function setSyncStatus(text, tone = "offline") {
     syncStatus.textContent = text;
     syncStatus.classList.remove("ok", "warn", "offline");
     syncStatus.classList.add(tone);
-}
-
-function migrateLegacyLocalStorageKeys() {
-    const currentList = localStorage.getItem(STORAGE_KEY);
-    const legacyList = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!currentList && legacyList) {
-        localStorage.setItem(STORAGE_KEY, legacyList);
-        localStorage.removeItem(LEGACY_STORAGE_KEY);
-    }
-
-    const currentSyncCode = localStorage.getItem(SYNC_CODE_KEY);
-    const legacySyncCode = localStorage.getItem(LEGACY_SYNC_CODE_KEY);
-    if (!currentSyncCode && legacySyncCode) {
-        localStorage.setItem(SYNC_CODE_KEY, legacySyncCode);
-        localStorage.removeItem(LEGACY_SYNC_CODE_KEY);
-    }
 }
 
 function setAuthStatus(text) {
@@ -565,7 +547,7 @@ async function forceAppUpdate() {
             const keys = await caches.keys();
             await Promise.all(
                 keys
-                    .filter(key => key.startsWith("erinnerungen-") || key.startsWith("einkaufsliste-"))
+                    .filter(key => key.startsWith("erinnerungen-"))
                     .map(key => caches.delete(key))
             );
         }
@@ -687,7 +669,7 @@ function startRealtimeSync() {
     stopRealtimeSync();
 
     remoteRealtimeChannel = supabaseClient
-        .channel(`shopping_items_${currentSyncCode}`)
+        .channel(`reminder_items_${currentSyncCode}`)
         .on(
             "postgres_changes",
             {
@@ -1564,7 +1546,6 @@ btnExport.onclick = async () => {
 setModus("erfassen");
 if (versionBadge) versionBadge.textContent = "v" + APP_VERSION;
 updateSyncDebug();
-migrateLegacyLocalStorageKeys();
 
 if (btnMic && !SpeechRecognitionCtor) {
     btnMic.disabled = true;
