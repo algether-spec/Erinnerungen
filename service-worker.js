@@ -6,6 +6,7 @@ const FILES_TO_CACHE = [
   "./index.html",
   "./style.css",
   "./app.js",
+  "./config.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -49,6 +50,7 @@ self.addEventListener("fetch", event => {
   const requestUrl = new URL(request.url);
   const sameOrigin = requestUrl.origin === self.location.origin;
   const cacheKeyByPath = requestUrl.pathname === "/" ? "./index.html" : `.${requestUrl.pathname}`;
+  const destination = request.destination || "";
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -70,12 +72,16 @@ self.addEventListener("fetch", event => {
         if (sameOrigin) {
           return caches.match(cacheKeyByPath).then(byPath => {
             if (byPath) return byPath;
-            return fetch(request).catch(() => caches.match("./index.html"));
+            return fetch(request).catch(() => {
+              if (destination === "document") return caches.match("./index.html");
+              return new Response("", { status: 503, statusText: "Offline" });
+            });
           });
         }
-        return fetch(request).catch(() =>
-          caches.match("./index.html")
-        );
+        return fetch(request).catch(() => {
+          if (destination === "document") return caches.match("./index.html");
+          return new Response("", { status: 503, statusText: "Offline" });
+        });
       })
   );
 });

@@ -56,11 +56,13 @@ const SpeechRecognitionCtor =
 const APP_CONFIG = window.APP_CONFIG || {};
 const STORAGE_KEY = "erinnerungen";
 const SUPABASE_TABLE = "reminder_items";
-const SUPABASE_CODES_TABLE = "sync_codes";
+const SUPABASE_USE_CODE_RPC = "use_sync_code";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
 const IMAGE_ENTRY_PREFIX = "__IMG__:";
-const SYNC_CODE_LENGTH = 4;
-const RESERVED_SYNC_CODE = "0000";
+const SYNC_CODE_LETTER_LENGTH = 4;
+const SYNC_CODE_DIGIT_LENGTH = 4;
+const SYNC_CODE_LENGTH = SYNC_CODE_LETTER_LENGTH + SYNC_CODE_DIGIT_LENGTH;
+const RESERVED_SYNC_CODE = "HELP0000";
 const BACKGROUND_SYNC_INTERVAL_MS = 4000;
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 60000;
 const hasSupabaseCredentials = Boolean(
@@ -122,13 +124,21 @@ function setAuthStatus(text) {
 }
 
 function normalizeSyncCode(input) {
-    return String(input || "")
-        .replace(/\D/g, "")
-        .slice(0, SYNC_CODE_LENGTH);
+    const raw = String(input || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+    const letters = raw.replace(/[^A-Z]/g, "").slice(0, SYNC_CODE_LETTER_LENGTH);
+    const digits = raw.replace(/\D/g, "").slice(0, SYNC_CODE_DIGIT_LENGTH);
+    return (letters + digits).slice(0, SYNC_CODE_LENGTH);
 }
 
 function isValidSyncCode(code) {
-    return new RegExp("^\\d{" + SYNC_CODE_LENGTH + "}$").test(code);
+    return new RegExp(
+        "^"
+        + "[A-Z]{" + SYNC_CODE_LETTER_LENGTH + "}"
+        + "\\d{" + SYNC_CODE_DIGIT_LENGTH + "}"
+        + "$"
+    ).test(code);
 }
 
 function isReservedSyncCode(code) {
@@ -138,79 +148,68 @@ function isReservedSyncCode(code) {
 function generateSyncCode() {
     let nextCode = RESERVED_SYNC_CODE;
     while (isReservedSyncCode(nextCode)) {
-        nextCode = String(Math.floor(Math.random() * 10000)).padStart(SYNC_CODE_LENGTH, "0");
+        const letters = Array.from({ length: SYNC_CODE_LETTER_LENGTH }, () =>
+            String.fromCharCode(65 + Math.floor(Math.random() * 26))
+        ).join("");
+        const digits = String(Math.floor(Math.random() * (10 ** SYNC_CODE_DIGIT_LENGTH)))
+            .padStart(SYNC_CODE_DIGIT_LENGTH, "0");
+        nextCode = letters + digits;
     }
     return nextCode;
 }
 
 function getStoredSyncCode() {
     const stored = normalizeSyncCode(localStorage.getItem(SYNC_CODE_KEY) || "");
-    if (stored && !isReservedSyncCode(stored)) return stored;
+    if (isValidSyncCode(stored) && !isReservedSyncCode(stored)) return stored;
     const created = generateSyncCode();
     localStorage.setItem(SYNC_CODE_KEY, created);
     return created;
 }
 
-async function isSyncCodeOccupied(code) {
-    if (!supabaseClient || !isValidSyncCode(code)) return false;
-    if (!(await ensureSupabaseAuth())) return false;
-
-    const { data, error } = await supabaseClient
-        .from(SUPABASE_CODES_TABLE)
-        .select("sync_code")
-        .eq("sync_code", String(code))
-        .limit(1);
-
-    if (error) throw error;
-    return Array.isArray(data) && data.length > 0;
-}
-
-async function touchSyncCodeUsage(code) {
-    if (!supabaseClient) return;
-    if (!isValidSyncCode(code)) return;
-    if (isReservedSyncCode(code)) return;
-    if (!(await ensureSupabaseAuth())) return;
-
-    const { error } = await supabaseClient
-        .from(SUPABASE_CODES_TABLE)
-        .upsert(
-            { sync_code: String(code), last_used_at: new Date().toISOString() },
-            { onConflict: "sync_code" }
-        );
-
-    if (error) throw error;
-}
-
-async function generateAvailableSyncCode(maxAttempts = 25) {
-    for (let i = 0; i < maxAttempts; i += 1) {
-        const candidate = generateSyncCode();
-        try {
-            if (!(await isSyncCodeOccupied(candidate))) return candidate;
-        } catch (err) {
-            console.warn("Freien Code konnte nicht online geprueft werden:", err);
-            return candidate;
-        }
+async function useSyncCodeRemote(code, options = {}) {
+    if (!supabaseClient) {
+        return { sync_code: code, created: false, joined: true };
     }
-    return generateSyncCode();
+    if (!(await ensureSupabaseAuth())) {
+        return { sync_code: code, created: false, joined: false, offline: true };
+    }
+    const allowCreate = options.allowCreate !== false;
+    const requireNew = options.requireNew === true;
+    const { data, error } = await supabaseClient.rpc(SUPABASE_USE_CODE_RPC, {
+        p_code: code,
+        p_allow_create: allowCreate,
+        p_require_new: requireNew
+    });
+    if (error) throw error;
+    return data || { sync_code: code, created: false, joined: true };
 }
 
 async function applySyncCode(code, shouldReload = true, options = {}) {
     const allowOccupied = options.allowOccupied !== false;
     const normalized = normalizeSyncCode(code);
     if (!isValidSyncCode(normalized)) {
-        setAuthStatus("Bitte 4-stelligen Zahlencode eingeben.");
+        setAuthStatus("Bitte Code mit 4 Buchstaben + 4 Zahlen eingeben (z. B. ABCD1234).");
         return;
     }
     if (isReservedSyncCode(normalized)) {
         openHelpViewer();
-        setAuthStatus("Code 0000 oeffnet die Kurzanleitung.");
+        setAuthStatus(`Code ${RESERVED_SYNC_CODE} oeffnet die Kurzanleitung.`);
         if (syncCodeInput) syncCodeInput.value = currentSyncCode || "";
         return;
     }
 
-    if (!allowOccupied && normalized !== currentSyncCode) {
-        try {
-            if (await isSyncCodeOccupied(normalized)) {
+    const requireNew = !allowOccupied && normalized !== currentSyncCode;
+
+    try {
+        await useSyncCodeRemote(normalized, {
+            allowCreate: true,
+            requireNew
+        });
+    } catch (err) {
+        console.warn("Code-Anmeldung fehlgeschlagen:", err);
+        if (requireNew) {
+            const raw = formatSupabaseError(err).toUpperCase();
+            if (raw.includes("SYNC_CODE_ALREADY_EXISTS")) {
                 setAuthStatus("Code ist bereits belegt. Bitte anderen Code nutzen.");
                 if (syncCodeInput) {
                     syncCodeInput.value = currentSyncCode || "";
@@ -219,11 +218,9 @@ async function applySyncCode(code, shouldReload = true, options = {}) {
                 }
                 return;
             }
-        } catch (err) {
-            console.warn("Code-Pruefung fehlgeschlagen:", err);
-            setAuthStatus(getSyncErrorHint(err));
-            return;
         }
+        setAuthStatus(getSyncErrorHint(err));
+        return;
     }
 
     currentSyncCode = normalized;
@@ -233,9 +230,6 @@ async function applySyncCode(code, shouldReload = true, options = {}) {
     setAuthStatus(`Geraete-Code: ${currentSyncCode}`);
     setSyncEditMode(false);
     if (syncCodeInput) syncCodeInput.blur();
-    void touchSyncCodeUsage(currentSyncCode).catch(err => {
-        console.warn("Code-Nutzung konnte nicht markiert werden:", err);
-    });
     if (supabaseClient) startRealtimeSync();
     updateSyncDebug();
     if (shouldReload) void laden();
@@ -271,11 +265,21 @@ function setupSyncCodeUi() {
         btnSyncApply.onclick = () => void applySyncCode(syncCodeInput?.value || "", true, { allowOccupied: true });
     }
 
+    if (syncCodeInput) {
+        syncCodeInput.addEventListener("input", () => {
+            syncCodeInput.value = normalizeSyncCode(syncCodeInput.value);
+        });
+    }
+
     if (btnSyncNew) {
         btnSyncNew.onclick = () =>
             void (async () => {
-                const newCode = await generateAvailableSyncCode();
-                await applySyncCode(newCode, true, { allowOccupied: false });
+                for (let attempt = 0; attempt < 8; attempt += 1) {
+                    const newCode = generateSyncCode();
+                    await applySyncCode(newCode, true, { allowOccupied: false });
+                    if (currentSyncCode === newCode) return;
+                }
+                setAuthStatus("Neuer Code konnte nicht gesetzt werden. Bitte erneut versuchen.");
             })();
     }
 
@@ -483,6 +487,18 @@ function getSyncErrorHint(err) {
     const raw = formatSupabaseError(err);
     const message = raw.toLowerCase();
     if (!message) return "Bitte Verbindung und Supabase-Einstellungen pruefen.";
+    if (message.includes("sync_code_rate_limit")) {
+        return "Zu viele Code-Versuche. Bitte spaeter erneut probieren.";
+    }
+    if (message.includes("sync_code_format_invalid")) {
+        return "Code-Format ungueltig. Bitte 4 Buchstaben + 4 Zahlen nutzen.";
+    }
+    if (message.includes("sync_code_reserved")) {
+        return `Code ${RESERVED_SYNC_CODE} ist nur fuer Hilfe reserviert.`;
+    }
+    if (message.includes("sync_code_not_found")) {
+        return "Code nicht gefunden. Bitte pruefen oder auf 'Neu' tippen.";
+    }
     if (message.includes("permission denied") || message.includes("not allowed")) {
         return "Supabase Rechte fehlen (schema.sql erneut ausfuehren).";
     }
@@ -793,7 +809,7 @@ async function ladenRemote() {
 
     const { data, error } = await supabaseClient
         .from(SUPABASE_TABLE)
-        .select("item_id, text, erledigt, position")
+        .select("item_id, text, title, note, erledigt, position, created_at, entry_date")
         .eq("sync_code", currentSyncCode)
         .order("position", { ascending: true });
 
@@ -802,12 +818,12 @@ async function ladenRemote() {
 
     return data.map((e, index) => ({
         itemId: String(e.item_id || "").trim() || generateItemId(),
-        text: String(e.text || ""),
-        title: String(e.text || ""),
-        note: "",
+        text: String(e.text || e.title || ""),
+        title: String(e.title || e.text || ""),
+        note: String(e.note || ""),
         erledigt: Boolean(e.erledigt),
-        createdAt: extractDateFromItemId(e.item_id),
-        entryDate: extractDateFromItemId(e.item_id),
+        createdAt: normalizeDateIso(e.created_at) || extractDateFromItemId(e.item_id),
+        entryDate: normalizeDateIso(e.entry_date || e.created_at) || extractDateFromItemId(e.item_id),
         position: Number.isFinite(e.position) ? e.position : index
     }));
 }
@@ -831,8 +847,15 @@ async function speichernRemote(daten, options = {}) {
         sync_code: currentSyncCode,
         item_id: String(e.itemId || "").trim() || generateItemId(),
         text: String(e.text || e.title || ""),
+        title: String(e.title || e.text || ""),
+        note: String(e.note || ""),
         erledigt: e.erledigt,
-        position: index
+        position: index,
+        created_at: normalizeDateIso(e.createdAt) || extractDateFromItemId(e.itemId) || new Date().toISOString(),
+        entry_date:
+            normalizeDateIso(e.entryDate || e.createdAt)
+            || extractDateFromItemId(e.itemId)
+            || new Date().toISOString()
     }));
 
     const { error: upsertError } = await supabaseClient
