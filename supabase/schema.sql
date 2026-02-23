@@ -151,6 +151,27 @@ begin
 end
 $$;
 
+create or replace function public.has_sync_membership(
+  p_sync_code text,
+  p_user_id uuid
+)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.device_sync_memberships m
+    where m.sync_code = p_sync_code
+      and m.user_id = p_user_id
+  );
+$$;
+
+revoke all on function public.has_sync_membership(text, uuid) from public;
+grant execute on function public.has_sync_membership(text, uuid) to authenticated;
+
 drop policy if exists "reminder_items_select_by_membership" on public.reminder_items;
 create policy "reminder_items_select_by_membership"
 on public.reminder_items
@@ -158,12 +179,7 @@ for select
 to authenticated
 using (
   auth.uid() is not null
-  and exists (
-    select 1
-    from public.device_sync_memberships m
-    where m.sync_code = reminder_items.sync_code
-      and m.user_id = auth.uid()
-  )
+  and public.has_sync_membership(reminder_items.sync_code, auth.uid())
 );
 
 drop policy if exists "reminder_items_insert_by_membership" on public.reminder_items;
@@ -180,12 +196,7 @@ with check (
   and title is not null and length(trim(title)) between 1 and 300
   and note is not null and length(note) <= 2000
   and position >= 0
-  and exists (
-    select 1
-    from public.device_sync_memberships m
-    where m.sync_code = reminder_items.sync_code
-      and m.user_id = auth.uid()
-  )
+  and public.has_sync_membership(reminder_items.sync_code, auth.uid())
 );
 
 drop policy if exists "reminder_items_update_by_membership" on public.reminder_items;
@@ -195,12 +206,7 @@ for update
 to authenticated
 using (
   auth.uid() is not null
-  and exists (
-    select 1
-    from public.device_sync_memberships m
-    where m.sync_code = reminder_items.sync_code
-      and m.user_id = auth.uid()
-  )
+  and public.has_sync_membership(reminder_items.sync_code, auth.uid())
 )
 with check (
   auth.uid() is not null
@@ -211,12 +217,7 @@ with check (
   and title is not null and length(trim(title)) between 1 and 300
   and note is not null and length(note) <= 2000
   and position >= 0
-  and exists (
-    select 1
-    from public.device_sync_memberships m
-    where m.sync_code = reminder_items.sync_code
-      and m.user_id = auth.uid()
-  )
+  and public.has_sync_membership(reminder_items.sync_code, auth.uid())
 );
 
 drop policy if exists "reminder_items_delete_by_membership" on public.reminder_items;
@@ -226,12 +227,7 @@ for delete
 to authenticated
 using (
   auth.uid() is not null
-  and exists (
-    select 1
-    from public.device_sync_memberships m
-    where m.sync_code = reminder_items.sync_code
-      and m.user_id = auth.uid()
-  )
+  and public.has_sync_membership(reminder_items.sync_code, auth.uid())
 );
 
 create or replace function public.use_sync_code(
