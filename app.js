@@ -403,7 +403,7 @@ function sortListByReminderDate() {
     const collator = new Intl.Collator("de", { sensitivity: "base" });
 
     const sortFn = (a, b) => {
-        const tsDiff = getEntryTimestamp(b) - getEntryTimestamp(a);
+        const tsDiff = getEntryTimestamp(a) - getEntryTimestamp(b);
         if (tsDiff !== 0) return tsDiff;
         return collator.compare(entryLabelFromData(a), entryLabelFromData(b));
     };

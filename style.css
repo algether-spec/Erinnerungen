@@ -400,6 +400,12 @@ body.modus-erledigt .auth-bar {
     gap: 10px;
 }
 
+/* Erledigt-Modus: Zeilenhoehe ca. +25% fuer bessere Trefferflaeche */
+body.modus-erledigt #liste li {
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
+
 #liste li.erledigt {
     border-left-color: var(--done);
     color: var(--done);
