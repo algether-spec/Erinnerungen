@@ -1130,7 +1130,8 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
 
         li.classList.add("erledigt");
         liste.appendChild(li);
-        speichern();
+        speichernLokal(datenAusListeLesen());
+        localDirty = true;
     };
 
     erledigt
