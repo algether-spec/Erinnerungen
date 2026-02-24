@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.5";
+const CACHE_VERSION = "v1.0.6";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 const FILES_TO_CACHE = [
