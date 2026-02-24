@@ -1126,15 +1126,11 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
 
     li.onclick = () => {
         if (modus !== "erledigt") return;
+        if (li.classList.contains("erledigt")) return;
 
-        li.classList.toggle("erledigt");
+        li.classList.add("erledigt");
+        liste.appendChild(li);
         speichern();
-
-        if (li.classList.contains("erledigt")) {
-            liste.appendChild(li);
-        } else {
-            liste.insertBefore(li, liste.firstChild);
-        }
     };
 
     erledigt
@@ -1523,6 +1519,10 @@ function setModus(neu) {
 
     if (vorher === "erledigt" && neu === "erfassen") {
         liste.querySelectorAll("li.erledigt").forEach(li => li.remove());
+        if (multiInput) {
+            multiInput.value = "";
+            autoResize();
+        }
         speichern(true);
     }
 }
