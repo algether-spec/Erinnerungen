@@ -1126,10 +1126,12 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
 
     li.onclick = () => {
         if (modus !== "erledigt") return;
-        if (li.classList.contains("erledigt")) return;
-
-        li.classList.add("erledigt");
-        liste.appendChild(li);
+        li.classList.toggle("erledigt");
+        if (li.classList.contains("erledigt")) {
+            liste.appendChild(li);
+        } else {
+            liste.insertBefore(li, liste.firstChild);
+        }
         speichernLokal(datenAusListeLesen());
         localDirty = true;
     };
