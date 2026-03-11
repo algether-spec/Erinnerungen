@@ -324,3 +324,68 @@ $$;
 
 revoke all on function public.use_sync_code(text, boolean, boolean) from public;
 grant execute on function public.use_sync_code(text, boolean, boolean) to authenticated;
+
+-- device_roles Tabelle
+create table if not exists public.device_roles (
+    id bigint generated always as identity primary key,
+    device_id text not null unique,
+    rolle text not null check (rolle in ('hauptgeraet', 'gast')),
+    sync_code text not null,
+    updated_at timestamptz default now()
+);
+
+alter table public.device_roles enable row level security;
+
+create policy if not exists "device_roles select" on public.device_roles
+    for select using (auth.role() = 'authenticated');
+
+create policy if not exists "device_roles insert" on public.device_roles
+    for insert with check (auth.role() = 'authenticated');
+
+create policy if not exists "device_roles update" on public.device_roles
+    for update using (auth.role() = 'authenticated');
+
+-- device_join_tokens Tabelle
+create table if not exists public.device_join_tokens (
+    id bigint generated always as identity primary key,
+    join_token text not null unique,
+    rolle text not null,
+    sync_code text not null,
+    created_by_device_id text,
+    expires_at timestamptz,
+    updated_at timestamptz default now()
+);
+
+alter table public.device_join_tokens enable row level security;
+
+create policy if not exists "device_join_tokens select" on public.device_join_tokens
+    for select using (auth.role() = 'authenticated');
+
+create policy if not exists "device_join_tokens insert" on public.device_join_tokens
+    for insert with check (auth.role() = 'authenticated');
+
+create policy if not exists "device_join_tokens upsert" on public.device_join_tokens
+    for update using (auth.role() = 'authenticated');
+
+-- sync_invites Tabelle (für Legacy-Einladungs-Links)
+create table if not exists public.sync_invites (
+    id bigint generated always as identity primary key,
+    device_id text not null unique,
+    sync_code text not null,
+    updated_at timestamptz default now()
+);
+
+alter table public.sync_invites enable row level security;
+
+create policy if not exists "sync_invites select" on public.sync_invites
+    for select using (auth.role() = 'authenticated');
+
+create policy if not exists "sync_invites insert" on public.sync_invites
+    for insert with check (auth.role() = 'authenticated');
+
+create policy if not exists "sync_invites upsert" on public.sync_invites
+    for update using (auth.role() = 'authenticated');
+
+grant select, insert, update on public.device_roles to authenticated;
+grant select, insert, update on public.device_join_tokens to authenticated;
+grant select, insert, update on public.sync_invites to authenticated;

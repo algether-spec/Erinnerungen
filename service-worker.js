@@ -1,16 +1,29 @@
-const CACHE_VERSION = "v1.0.6";
+const CACHE_VERSION = "v1.0.7";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
+
+// Separater Cache ohne Versionsnummer – überlebt SW-Updates.
+const HANDOFF_CACHE = "erinnerungen-handoff";
+const HANDOFF_KEY = "/__install_context__";
+
+// Im Speicher (geht verloren wenn iOS den SW beendet, daher Cache als Backup)
+let _manifestInstallContext = null;
 
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
-  "./style.css",
-  "./app.js",
   "./config.js",
+  "./utils.js",
+  "./supabase-lib.js",
+  "./supabase.js",
+  "./sync.js",
+  "./ui.js",
+  "./app.js",
+  "./style.css",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./icon-maskable.png"
+  "./icon-maskable.png",
+  "./apple-touch-icon-180.png"
 ];
 
 /* INSTALL */
@@ -29,7 +42,7 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)
+          .filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE)
           .map(key => caches.delete(key))
       )
     )
@@ -42,7 +55,66 @@ self.addEventListener("message", event => {
   if (event.data?.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
+  if (event.data?.type === "SET_INSTALL_CONTEXT") {
+    _manifestInstallContext = {
+      joinToken: String(event.data.joinToken || ""),
+      inviteDeviceId: String(event.data.inviteDeviceId || ""),
+      code: String(event.data.code || "")
+    };
+    // Persistent speichern – überlebt SW-Neustarts
+    caches.open(HANDOFF_CACHE).then(cache =>
+      cache.put(HANDOFF_KEY, new Response(JSON.stringify(_manifestInstallContext), {
+        headers: { "Content-Type": "application/json" }
+      }))
+    ).catch(() => {});
+  }
 });
+
+// Install-Kontext aus dem Cache lesen (Fallback wenn SW neu gestartet wurde)
+async function handoffKontextLesen() {
+  if (_manifestInstallContext) return _manifestInstallContext;
+  try {
+    const cache = await caches.open(HANDOFF_CACHE);
+    const res = await cache.match(HANDOFF_KEY);
+    if (res) {
+      _manifestInstallContext = await res.json();
+      return _manifestInstallContext;
+    }
+  } catch (_) {}
+  return null;
+}
+
+// Manifest dynamisch mit aktuellem Install-Kontext ausliefern.
+async function manifestMitKontextAusliefern(request) {
+  const context = await handoffKontextLesen();
+  let response;
+  try {
+    response = await fetch(request.url);
+  } catch (_) {
+    const cached = await caches.match("./manifest.json");
+    if (cached) response = cached;
+  }
+  if (!response) return new Response("Not found", { status: 404 });
+  if (!context?.joinToken && !context?.inviteDeviceId && !context?.code) return response;
+  try {
+    const manifest = await response.json();
+    if (context?.joinToken) {
+      manifest.start_url = "./#join=" + encodeURIComponent(context.joinToken);
+    } else if (context?.inviteDeviceId) {
+      manifest.start_url = "./#invite=" + encodeURIComponent(context.inviteDeviceId);
+    } else if (context?.code) {
+      manifest.start_url = "./#code=" + context.code;
+    }
+    return new Response(JSON.stringify(manifest), {
+      headers: {
+        "Content-Type": "application/manifest+json",
+        "Cache-Control": "no-store"
+      }
+    });
+  } catch (_) {
+    return response;
+  }
+}
 
 /* FETCH */
 self.addEventListener("fetch", event => {
@@ -50,7 +122,12 @@ self.addEventListener("fetch", event => {
   const requestUrl = new URL(request.url);
   const sameOrigin = requestUrl.origin === self.location.origin;
   const cacheKeyByPath = requestUrl.pathname === "/" ? "./index.html" : `.${requestUrl.pathname}`;
-  const destination = request.destination || "";
+
+  // Manifest dynamisch ausliefern
+  if (sameOrigin && requestUrl.pathname.endsWith("/manifest.json")) {
+    event.respondWith(manifestMitKontextAusliefern(request));
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -73,13 +150,11 @@ self.addEventListener("fetch", event => {
           return caches.match(cacheKeyByPath).then(byPath => {
             if (byPath) return byPath;
             return fetch(request).catch(() => {
-              if (destination === "document") return caches.match("./index.html");
               return new Response("", { status: 503, statusText: "Offline" });
             });
           });
         }
         return fetch(request).catch(() => {
-          if (destination === "document") return caches.match("./index.html");
           return new Response("", { status: 503, statusText: "Offline" });
         });
       })

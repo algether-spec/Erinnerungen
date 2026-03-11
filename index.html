@@ -10,29 +10,22 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta
         http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+        content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
     <meta
         http-equiv="Permissions-Policy"
         content="camera=(self), microphone=(self), geolocation=()">
 
-    <!-- PWA (klassisch, bewährt) -->
+    <!-- PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="style.css?v=1.0.6">
+    <link rel="stylesheet" href="style.css?v=1.0.7">
 
     <!-- Manifest -->
-    <link rel="manifest" href="manifest.json?v=1.0.6">
+    <link rel="manifest" href="manifest.json?v=1.0.7">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
-
-    <!-- Service Worker -->
-    <script>
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("service-worker.js?v=1.0.6", { updateViaCache: "none" });
-        }
-    </script>
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
 </head>
 
 <body>
@@ -46,17 +39,22 @@
 
 <div class="app">
 
-    <header>Erinnerungen</header>
+    <header>
+        <span class="header-title">Erinnerungen</span>
+        <button type="button" id="btn-help" class="help-button" title="Hilfe">❓</button>
+    </header>
 
     <div class="sync-code-compact" id="sync-code-compact">
-        Code:
-        <button type="button" id="btn-sync-code-display" class="sync-code-display">ABCD1234</button>
-        <button type="button" id="btn-sync-code-edit" class="sync-code-edit">Code aendern</button>
-        <button type="button" id="btn-force-update" class="update-button">Update</button>
-        <div class="sync-code-hint">Hinweis: Code HELP0000 oeffnet nur die Kurzanleitung.</div>
+        <div class="sync-code-row">
+            <span class="sync-code-label">Code:</span>
+            <button type="button" id="btn-sync-code-display" class="sync-code-display">...</button>
+            <button type="button" id="btn-sync-code-share" class="sync-code-share" hidden>Teilen</button>
+            <button type="button" id="btn-sync-connect" class="sync-code-edit" hidden>Verbinden</button>
+            <button type="button" id="btn-force-update" class="update-button">Update</button>
+        </div>
     </div>
 
-    <div class="auth-bar is-hidden" id="auth-bar" hidden>
+    <div class="auth-bar" id="auth-bar" hidden>
         <input
             type="text"
             id="sync-code"
@@ -64,9 +62,8 @@
             maxlength="8"
             pattern="[A-Za-z]{4}[0-9]{4}"
             autocapitalize="characters"
-            placeholder="Geraete-Code (z. B. ABCD1234)">
+            placeholder="Geraete-Code (z. B. LUIS0090)">
         <button type="button" id="btn-sync-apply" class="auth-button">Verbinden</button>
-        <button type="button" id="btn-sync-new" class="auth-button auth-logout">Neu</button>
         <div id="auth-status" class="auth-status"></div>
     </div>
 
@@ -116,6 +113,8 @@
             <div id="mic-status" class="mic-status" aria-live="polite"></div>
         </div>
 
+        <div id="input-error-status" class="input-error-status" aria-live="polite"></div>
+
         <ul id="liste"></ul>
 
     </main>
@@ -129,20 +128,45 @@
         <div class="help-card">
             <button type="button" id="btn-help-viewer-close" class="help-close">Schließen</button>
             <h2>Kurzanleitung</h2>
-            <ol>
-                <li>App einmal installieren und danach als App öffnen (PWA).</li>
-                <li>Auf beiden Handys denselben Geraete-Code mit 4 Buchstaben + 4 Zahlen eingeben.</li>
-                <li><strong>Text:</strong> In das Feld schreiben, dann <strong>Übernehmen</strong>.</li>
-                <li><strong>Sprache:</strong> Auf <strong>🎤</strong> tippen, Text prüfen, dann <strong>Übernehmen</strong>.</li>
-                <li><strong>Bild:</strong> Auf <strong>Foto</strong> tippen; das Foto wird sofort gespeichert.</li>
-                <li>Im Modus <strong>Erledigt</strong> Einträge antippen, um sie abzuhaken.</li>
-                <li>Code <strong>HELP0000</strong> ist nur fuer diese Kurzanleitung reserviert.</li>
-            </ol>
+            <div class="help-section">
+                <div class="help-section-title">🔄 Installation &amp; Teilen</div>
+                <ul class="help-list">
+                    <li>Das erste Gerät wird automatisch <strong>Hauptgerät</strong></li>
+                    <li>Hauptgerät: auf <strong>🔗 Teilen</strong> tippen → Link erzeugen &amp; ans andere Gerät senden</li>
+                    <li>Gastgerät: Link öffnen → automatisch beigetreten, kein Code nötig</li>
+                    <li>Immer zu Homebildschirm hinzufügen – danach ist es eine WebApp</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <div class="help-section-title">🎤 Mikrofon</div>
+                <ul class="help-list">
+                    <li>Auf <strong>🎤</strong> tippen, um Spracherkennung zu starten (beim ersten Mal zulassen)</li>
+                    <li>Text im Eingabefeld prüfen</li>
+                    <li>Mit <strong>✅ Übernehmen</strong> zur Liste hinzufügen</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <div class="help-section-title">📱 Buttons</div>
+                <ul class="help-list">
+                    <li><strong>🗑️ Löschen</strong> – Eingabefeld leeren</li>
+                    <li><strong>✅ Übernehmen</strong> – Erinnerung zur Liste hinzufügen</li>
+                    <li><strong>📷 Foto</strong> – Foto aufnehmen, Text dazu fügen möglich</li>
+                    <li><strong>📤 Export</strong> – Liste als Text in die Zwischenablage kopieren</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <div class="help-section-title">🧠 Erfassen &amp; Erledigt</div>
+                <ul class="help-list">
+                    <li><strong>Erfassen</strong> – Erinnerungen eingeben und zur Liste hinzufügen</li>
+                    <li><strong>Erledigt</strong> – Einträge antippen um sie abzuhaken</li>
+                    <li>Abgehakte Einträge werden beim Wechsel auf Erfassen gelöscht</li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <div class="version-row">
-        <div class="version-badge" id="version-badge">v1.0.6</div>
+        <div class="version-badge" id="version-badge">v1.0.7</div>
     </div>
     <div class="sync-status" id="sync-status">Sync: Lokal</div>
     <div class="sync-debug" id="sync-debug" hidden></div>
@@ -159,9 +183,13 @@
 
 </div>
 
-<script src="config.js?v=1.0.6"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=1.0.6"></script>
+<script src="config.js?v=1.0.7"></script>
+<script src="utils.js?v=1.0.7"></script>
+<script src="supabase-lib.js"></script>
+<script src="supabase.js?v=1.0.7"></script>
+<script src="sync.js?v=1.0.7"></script>
+<script src="ui.js?v=1.0.7"></script>
+<script src="app.js?v=1.0.7"></script>
 
 </body>
 </html>
