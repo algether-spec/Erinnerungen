@@ -760,7 +760,6 @@ function hintergrundSyncStarten() {
     hintergrundTimer = setInterval(() => {
         if (document.hidden) return;
         if (keinNetzwerk()) return;
-        if (echtzeitKanal) return;
         void refreshFromRemoteIfChanged();
     }, BACKGROUND_SYNC_INTERVAL_MS);
 

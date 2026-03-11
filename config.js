@@ -9,7 +9,7 @@ const APP_CONFIG = window.APP_CONFIG || {};
    KONSTANTEN
 ====================== */
 
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.8";
 const STORAGE_KEY = "erinnerungen";
 const SUPABASE_TABLE = "reminder_items";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
