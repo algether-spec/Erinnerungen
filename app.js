@@ -63,7 +63,7 @@ if (_urlCodeGueltig && _hatVorherigenCode && _preExistingCode !== _normalizedUrl
     }
 }
 
-if (btnForceUpdate) btnForceUpdate.onclick = () => void forceAppUpdate();
+if (btnForceUpdate) btnForceUpdate.onclick = () => void updateErzwingen();
 autoUpdateEinrichten();
 
 if (supabaseClient) {
