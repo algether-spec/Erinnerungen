@@ -354,8 +354,8 @@ button:disabled {
 }
 
 .update-button {
-    min-height: 32px;
-    padding: 6px 10px;
+    min-height: 28px;
+    padding: 4px 10px;
     border-radius: 10px;
     border: 1px solid #cbd5e1;
     background: #f8fafc;
@@ -363,6 +363,19 @@ button:disabled {
     font-size: 12px;
     font-weight: 700;
     margin-left: auto;
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.update-button.update-available {
+    background: #16a34a;
+    border-color: #15803d;
+    color: #fff;
+    animation: update-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes update-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.5); }
+    50%       { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
 }
 
 .sync-status {
@@ -425,6 +438,31 @@ body.modus-erledigt .auth-bar {
     font-size: 16px;
     justify-content: space-between;
     gap: 10px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+#liste li.pending {
+    background: #fff7ed;
+    border-left-color: #ea580c;
+    position: relative;
+    overflow: hidden;
+}
+
+#liste li.pending::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #c2410c;
+    animation: pending-progress 0.5s linear forwards;
+}
+
+@keyframes pending-progress {
+    from { width: 0%; }
+    to   { width: 100%; }
 }
 
 /* Erledigt-Modus: Zeilenhoehe ca. +25% fuer bessere Trefferflaeche */
@@ -641,10 +679,28 @@ body.modus-erledigt #liste li {
 }
 
 .input-error-status {
-    min-height: 16px;
-    font-size: 12px;
+    display: block;
+    width: 100%;
+    min-height: 0;
+    font-size: 10px;
+    line-height: 1.05;
     color: #b91c1c;
-    padding: 0 2px;
+    font-weight: 600;
+}
+
+.input-error-status:empty {
+    display: none;
+}
+
+.version-subline {
+    margin: 0 10px 6px;
+    text-align: left;
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.mic-status:empty {
+    display: none;
 }
 
 [hidden] { display: none !important; }

@@ -13,7 +13,6 @@ let syncEditMode = false;
 let lastSyncAt = "";
 let hintergrundTimer = null;
 let updatePruefTimer = null;
-let updateLaeuft = false;
 let remoteSyncInFlight = false;
 let remoteSyncQueued = false;
 let remoteSyncForceOverwrite = false;
@@ -753,6 +752,37 @@ function syncCodeUiEinrichten(initOptions = {}) {
 
 /* --- Hintergrund-Sync ------------------------------------------- */
 
+async function autoWiederverbinden() {
+    if (!supabaseClient) return;
+    if (keinNetzwerk()) return;
+    if (syncEditMode) return;
+
+    const candidate = syncCodeNormalisieren(currentSyncCode || localStorage.getItem(SYNC_CODE_KEY) || "");
+    if (!istGueltigerSyncCode(candidate) || istReservierterSyncCode(candidate)) return;
+
+    if (currentSyncCode !== candidate) {
+        authStatusSetzen("Online erkannt. Verbinde mit gespeichertem Code...");
+        await syncCodeAnwenden(candidate, false, { allowOccupied: true });
+    }
+
+    if (currentSyncCode === candidate) {
+        authStatusSetzen("Online erkannt. Synchronisiere...");
+        await syncRemoteIfNeeded();
+    }
+}
+
+function _onSyncFocus() {
+    if (keinNetzwerk()) return;
+    void refreshFromRemoteIfChanged();
+}
+function _onSyncOnline() {
+    void autoWiederverbinden().catch(err => console.warn("autoWiederverbinden fehlgeschlagen:", err));
+    void refreshFromRemoteIfChanged();
+}
+function _onSyncVisibilityChange() {
+    if (!document.hidden && !keinNetzwerk()) void refreshFromRemoteIfChanged();
+}
+
 function hintergrundSyncStarten() {
     if (!supabaseClient) return;
     if (hintergrundTimer) clearInterval(hintergrundTimer);
@@ -763,125 +793,69 @@ function hintergrundSyncStarten() {
         void refreshFromRemoteIfChanged();
     }, BACKGROUND_SYNC_INTERVAL_MS);
 
-    window.addEventListener("focus", () => {
-        if (!keinNetzwerk()) void refreshFromRemoteIfChanged();
-    });
-    window.addEventListener("online", () => void refreshFromRemoteIfChanged());
-    document.addEventListener("visibilitychange", () => {
-        if (!document.hidden && !keinNetzwerk()) void refreshFromRemoteIfChanged();
-    });
+    window.removeEventListener("focus", _onSyncFocus);
+    window.addEventListener("focus", _onSyncFocus);
+    window.removeEventListener("online", _onSyncOnline);
+    window.addEventListener("online", _onSyncOnline);
+    document.removeEventListener("visibilitychange", _onSyncVisibilityChange);
+    document.addEventListener("visibilitychange", _onSyncVisibilityChange);
 }
 
 
 /* --- Update-Mechanismus ----------------------------------------- */
 
-async function forceAppUpdate() {
+async function updateErzwingen() {
     if (btnForceUpdate) btnForceUpdate.disabled = true;
+    updateButtonVerfuegbarSetzen(false);
     syncStatusSetzen("Update: wird angewendet...", "warn");
 
     try {
+        // 1. Alle Caches löschen
         if ("caches" in window) {
             const keys = await caches.keys();
-            await Promise.all(
-                keys
-                    .filter(key => key.startsWith("erinnerungen-"))
-                    .map(key => caches.delete(key))
-            );
+            await Promise.all(keys.map(key => caches.delete(key)));
         }
 
+        // 2. Service Worker deregistrieren
         if ("serviceWorker" in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
-
-            for (const registration of registrations) {
-                await registration.update();
-                if (!registration.waiting && registration.installing) {
-                    await _aufSwWarten(registration.installing);
-                }
-                if (await _wartendenSwAktivieren(registration)) {
-                    syncStatusSetzen("Update: aktiv", "ok");
-                    reloadWithCacheBust();
-                    return;
-                }
-            }
-
             await Promise.all(registrations.map(r => r.unregister()));
         }
 
-        await new Promise(resolve => setTimeout(resolve, 180));
-        reloadWithCacheBust();
+        // 3. Seite neu laden – holt alle Dateien frisch vom Server
+        window.location.reload(true);
     } catch (err) {
         console.warn("Update fehlgeschlagen:", err);
         syncStatusSetzen("Update fehlgeschlagen", "offline");
-        authStatusSetzen("Update fehlgeschlagen. Bitte Seite neu laden.");
         if (btnForceUpdate) btnForceUpdate.disabled = false;
     }
 }
 
-function _aufSwWarten(worker, timeoutMs = 10000) {
-    if (!worker || worker.state === "installed" || worker.state === "redundant") {
-        return Promise.resolve();
-    }
-    return new Promise(resolve => {
-        const handler = () => {
-            if (worker.state === "installed" || worker.state === "redundant") {
-                worker.removeEventListener("statechange", handler);
-                resolve();
-            }
-        };
-        worker.addEventListener("statechange", handler);
-        setTimeout(() => { worker.removeEventListener("statechange", handler); resolve(); }, timeoutMs);
-    });
+function updateButtonVerfuegbarSetzen(verfuegbar) {
+    if (!btnForceUpdate) return;
+    btnForceUpdate.classList.toggle("update-available", verfuegbar);
 }
 
-async function _wartendenSwAktivieren(registration) {
-    if (!registration?.waiting) return false;
-    const changedPromise = waitForControllerChange();
-    registration.waiting.postMessage({ type: "SKIP_WAITING" });
-    return changedPromise;
-}
-
-async function hasWaitingServiceWorkerUpdate() {
-    if (!("serviceWorker" in navigator)) return false;
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    for (const registration of registrations) {
-        if (registration.waiting) return true;
-        await registration.update();
-        if (registration.waiting) return true;
-        if (registration.installing) {
-            await _aufSwWarten(registration.installing);
-        }
-        if (registration.waiting) return true;
-    }
-    return false;
-}
-
-async function maybeAutoUpdate(trigger = "auto") {
-    if (updateLaeuft) return;
-
+async function serverVersionLaden() {
     try {
-        const hasUpdate = await hasWaitingServiceWorkerUpdate();
-        if (!hasUpdate) return;
+        const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return String(data.version || "").trim();
+    } catch {
+        return null;
+    }
+}
 
-        const hatAktiveBearbeitung = Boolean(
-            (typeof isListening !== "undefined" && isListening)
-            || (typeof multiInput !== "undefined" && multiInput && multiInput.value.trim().length > 0)
-            || localDirty
-            || remoteSyncInFlight
-        );
-
-        if (hatAktiveBearbeitung) {
-            syncStatusSetzen("Update verfuegbar", "warn");
-            authStatusSetzen("Neue Version erkannt. Bei Leerlauf wird automatisch aktualisiert.");
-            return;
-        }
-
-        updateLaeuft = true;
-        authStatusSetzen(`Neue Version erkannt (${trigger}). Update startet...`);
-        await forceAppUpdate();
+async function autoUpdatePruefen() {
+    try {
+        const serverVersion = await serverVersionLaden();
+        if (!serverVersion) return;
+        const hasUpdate = serverVersion !== APP_VERSION;
+        updateButtonVerfuegbarSetzen(hasUpdate);
+        if (hasUpdate) syncStatusSetzen("Update verfuegbar", "warn");
     } catch (err) {
         console.warn("Auto-Update-Pruefung fehlgeschlagen:", err);
-    } finally {
-        updateLaeuft = false;
     }
 }
 
@@ -891,19 +865,19 @@ function autoUpdateEinrichten() {
 
     updatePruefTimer = setInterval(() => {
         if (document.hidden) return;
-        void maybeAutoUpdate("interval");
+        void autoUpdatePruefen();
     }, AUTO_UPDATE_CHECK_INTERVAL_MS);
 
     if (!autoUpdateEinrichten._listenersRegistered) {
         autoUpdateEinrichten._listenersRegistered = true;
-        window.addEventListener("focus", () => void maybeAutoUpdate("focus"));
-        window.addEventListener("online", () => void maybeAutoUpdate("online"));
+        window.addEventListener("focus", () => void autoUpdatePruefen());
+        window.addEventListener("online", () => void autoUpdatePruefen());
         document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) void maybeAutoUpdate("visible");
+            if (!document.hidden) void autoUpdatePruefen();
         });
     }
 
-    void maybeAutoUpdate("startup");
+    void autoUpdatePruefen();
 }
 
 

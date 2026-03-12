@@ -9,7 +9,7 @@ const APP_CONFIG = window.APP_CONFIG || {};
    KONSTANTEN
 ====================== */
 
-const APP_VERSION = "1.0.8";
+const APP_VERSION = "1.0.9";
 const STORAGE_KEY = "erinnerungen";
 const SUPABASE_TABLE = "reminder_items";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
@@ -26,7 +26,7 @@ const SYNC_CODE_LENGTH = 8;
 const RESERVED_SYNC_CODE = "HELP0000";
 
 const BACKGROUND_SYNC_INTERVAL_MS = 4000;
-const AUTO_UPDATE_CHECK_INTERVAL_MS = 60000;
+const AUTO_UPDATE_CHECK_INTERVAL_MS = 300000; // 5 Minuten
 const MIC_SESSION_MS = 30000;
 
 const MODUS_ERFASSEN = "erfassen";

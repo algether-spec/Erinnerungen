@@ -115,6 +115,8 @@ function sortListByReminderDate() {
 
 /* --- Listen-Rendering ------------------------------------------- */
 
+const longPressTimers = new WeakMap();
+
 function datenAusListeLesen() {
     const daten = [];
     liste.querySelectorAll("li").forEach((li, index) => {
@@ -236,17 +238,41 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
 
     if (inputErledigt) li.classList.add("erledigt");
 
-    li.onclick = () => {
-        if (modus !== MODUS_ERLEDIGT) return;
-        li.classList.toggle("erledigt");
-        if (li.classList.contains("erledigt")) {
-            liste.appendChild(li);
-        } else {
-            liste.insertBefore(li, liste.firstChild);
-        }
-        speichernLokal(datenAusListeLesen());
-        localDirty = true;
+    const cancelLongPress = () => {
+        const timers = longPressTimers.get(li);
+        if (!timers) return;
+        clearTimeout(timers.activate);
+        longPressTimers.delete(li);
+        li.classList.remove("pending");
     };
+
+    li.addEventListener("pointerdown", e => {
+        if (modus !== MODUS_ERLEDIGT) return;
+        e.preventDefault();
+        li.setPointerCapture(e.pointerId);
+        cancelLongPress();
+
+        const timers = { activate: null };
+        longPressTimers.set(li, timers);
+        li.classList.add("pending");
+
+        timers.activate = setTimeout(() => {
+            if (!longPressTimers.has(li)) return;
+            longPressTimers.delete(li);
+            li.classList.remove("pending");
+            if (li.classList.contains("erledigt")) {
+                li.classList.remove("erledigt");
+            } else {
+                li.classList.add("erledigt");
+            }
+            sortListByReminderDate();
+            speichern(true);
+        }, 500);
+    });
+
+    li.addEventListener("pointerup",     cancelLongPress);
+    li.addEventListener("pointercancel", cancelLongPress);
+    li.addEventListener("contextmenu",   e => e.preventDefault());
 
     inputErledigt
         ? liste.appendChild(li)
