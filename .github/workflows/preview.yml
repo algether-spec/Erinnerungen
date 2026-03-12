@@ -1,24 +1,19 @@
-name: Deploy to GitHub Pages
+name: Preview Deploy (feature/erinnerungen)
 
-# Deployt main unter: https://algether-spec.github.io/Erinnerungen/
-#
-# Nutzt JamesIves/github-pages-deploy-action statt actions/deploy-pages,
-# damit das preview/-Verzeichnis (Feature-Branch-Deployments) erhalten bleibt.
-#
-# GitHub Pages Quelle (einmalig setzen):
-#   Settings → Pages → Source: "Deploy from a branch" → Branch: gh-pages / root
+# Deployt feature/erinnerungen unter:
+# https://algether-spec.github.io/Erinnerungen/preview/feature-erinnerungen/
 
 on:
   push:
-    branches: [main]
+    branches: [feature/erinnerungen]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: pages-main
-  cancel-in-progress: false
+  group: pages-preview-erinnerungen
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -45,13 +40,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Auf gh-pages Branch deployen
+      - name: Auf gh-pages Branch deployen (Preview)
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
           folder: _deploy
-          single-commit: true
+          target-folder: preview/feature-erinnerungen
           clean: true
-          clean-exclude: |
-            preview/
-          commit-message: "deploy: main @ ${{ github.sha }}"
+          commit-message: "preview: feature/erinnerungen @ ${{ github.sha }}"

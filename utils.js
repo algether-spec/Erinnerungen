@@ -39,6 +39,21 @@ function formatEntryDate(createdAt) {
     }
 }
 
+function formatDueDate(dueDate) {
+    if (!dueDate) return "";
+    const parts = String(dueDate).split("-");
+    if (parts.length < 3) return dueDate;
+    return `${parts[2]}.${parts[1]}.`;
+}
+
+function getTodayDateString() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
 /* --- Netzwerk ---------------------------------------------------- */
 
 function keinNetzwerk() {

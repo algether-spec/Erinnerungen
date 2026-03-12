@@ -248,10 +248,10 @@ button:disabled {
 
 .input-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-areas:
-        "mic clear export"
-        "add add photo";
+        "mic  clear  due   export"
+        "add  add    photo photo";
     gap: 8px;
     align-items: stretch;
 }
@@ -511,6 +511,63 @@ body.modus-erledigt #liste li {
     border-radius: 999px;
     padding: 2px 8px;
     white-space: nowrap;
+}
+
+/* Überfällig – rot */
+#liste li.overdue {
+    border-left-color: #dc2626;
+}
+#liste li.overdue .list-item-date {
+    color: #fff;
+    background: #dc2626;
+    font-weight: 600;
+}
+
+/* Heute fällig – orange */
+#liste li.due-today {
+    border-left-color: #ea580c;
+}
+#liste li.due-today .list-item-date {
+    color: #fff;
+    background: #ea580c;
+    font-weight: 600;
+}
+
+/* Datum-Picker Button */
+.due-date-wrap {
+    grid-area: due;
+    position: relative;
+    display: flex;
+}
+
+.due-date-button {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.due-date-button.has-date {
+    background: #fff7ed;
+    border-color: #ea580c;
+}
+
+.due-date-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
 }
 
 .list-photo-thumb {
@@ -888,6 +945,16 @@ nav button:not(.active) {
 
     header {
         background: #3b1f14;
+    }
+
+    .due-date-button {
+        background: #3c2a23;
+        border-color: #4b5563;
+    }
+
+    .due-date-button.has-date {
+        background: #431407;
+        border-color: #ea580c;
     }
 }
 

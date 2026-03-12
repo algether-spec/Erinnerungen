@@ -25,6 +25,7 @@ const authStatus     = document.getElementById("auth-status");
 
 const multiInput       = document.getElementById("multi-line-input");
 const multiAdd         = document.getElementById("add-all-button");
+const dueDateInput     = document.getElementById("due-date-input");
 const btnPhotoOcr      = document.getElementById("btn-photo-ocr");
 const photoOcrInput    = document.getElementById("photo-ocr-input");
 const btnClearInput    = document.getElementById("btn-clear-input");
@@ -95,6 +96,11 @@ function sortListByReminderDate() {
     const collator = new Intl.Collator("de", { sensitivity: "base" });
 
     const sortFn = (a, b) => {
+        const aDue = a.dueDate || "";
+        const bDue = b.dueDate || "";
+        if (aDue && bDue) return aDue < bDue ? -1 : aDue > bDue ? 1 : 0;
+        if (aDue && !bDue) return -1;
+        if (!aDue && bDue) return 1;
         const tsDiff = getEntryTimestamp(a) - getEntryTimestamp(b);
         if (tsDiff !== 0) return tsDiff;
         return collator.compare(entryLabelFromData(a), entryLabelFromData(b));
@@ -125,11 +131,13 @@ function datenAusListeLesen() {
         const entryDate = normalizeDateIso(li.dataset.entryDate || li.dataset.createdAt) || createdAt;
         const title = String(li.dataset.title || li.dataset.rawText || li.dataset.text || "").trim();
         const note = String(li.dataset.note || "").trim();
+        const dueDate = String(li.dataset.dueDate || "").trim().slice(0, 10);
         li.dataset.itemId = itemId;
         li.dataset.createdAt = createdAt;
         li.dataset.entryDate = entryDate;
         li.dataset.title = title;
         li.dataset.note = note;
+        li.dataset.dueDate = dueDate;
         daten.push({
             itemId,
             text: li.dataset.rawText || li.dataset.text || title,
@@ -138,6 +146,7 @@ function datenAusListeLesen() {
             erledigt: li.classList.contains("erledigt"),
             createdAt,
             entryDate,
+            dueDate,
             position: index
         });
     });
@@ -164,6 +173,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
     const normalizedEntryDate =
         normalizeDateIso(inputIsObject ? (text.entryDate || text.createdAt) : createdAt)
         || normalizedCreatedAt;
+    const normalizedDueDate = inputIsObject ? String(text.dueDate || "").trim().slice(0, 10) : "";
 
     li.dataset.itemId = normalizedItemId;
     li.dataset.rawText = rawText;
@@ -172,6 +182,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
     li.dataset.note = entryNote;
     li.dataset.createdAt = normalizedCreatedAt;
     li.dataset.entryDate = normalizedEntryDate;
+    li.dataset.dueDate = normalizedDueDate;
 
     if (rawText.startsWith(IMAGE_ENTRY_PREFIX)) {
         const imageSrc = rawText.slice(IMAGE_ENTRY_PREFIX.length);
@@ -233,7 +244,16 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
 
     const dateSpan = document.createElement("span");
     dateSpan.className = "list-item-date";
-    dateSpan.textContent = formatEntryDate(normalizedEntryDate);
+    if (normalizedDueDate) {
+        dateSpan.textContent = formatDueDate(normalizedDueDate);
+        if (!inputErledigt) {
+            const today = getTodayDateString();
+            if (normalizedDueDate < today) li.classList.add("overdue");
+            else if (normalizedDueDate === today) li.classList.add("due-today");
+        }
+    } else {
+        dateSpan.textContent = formatEntryDate(normalizedEntryDate);
+    }
     li.appendChild(dateSpan);
 
     if (inputErledigt) li.classList.add("erledigt");
@@ -380,14 +400,16 @@ function mehrzeilenSpeichern() {
     const text = multiInput.value.trim();
     if (!text) return;
 
+    const dueDate = dueDateInput ? String(dueDateInput.value || "").trim() : "";
     text.split("\n")
         .map(l => l.trim())
         .filter(Boolean)
-        .forEach(item => eintragAnlegen(item));
+        .forEach(item => eintragAnlegen({ text: item, dueDate }));
 
     speichern();
     multiInput.value = "";
     autoResize();
+    if (dueDateInput) { dueDateInput.value = ""; dueDateButtonAktualisieren(); }
     multiInput.blur();
 
     if (isListening) {
@@ -424,6 +446,22 @@ function clearInputBuffer(stopDictation = false) {
 }
 
 if (multiAdd) multiAdd.onclick = mehrzeilenSpeichern;
+
+/* --- Fälligkeitsdatum-Button ------------------------------------ */
+
+function dueDateButtonAktualisieren() {
+    const btn = document.getElementById("btn-due-date");
+    if (!btn || !dueDateInput) return;
+    const hasDate = Boolean(dueDateInput.value);
+    btn.classList.toggle("has-date", hasDate);
+    btn.title = hasDate
+        ? `Fällig: ${formatDueDate(dueDateInput.value)} (tippen zum Ändern)`
+        : "Fälligkeitsdatum setzen";
+}
+
+if (dueDateInput) {
+    dueDateInput.addEventListener("change", dueDateButtonAktualisieren);
+}
 
 if (btnClearInput) {
     btnClearInput.onclick = () => clearInputBuffer(false);

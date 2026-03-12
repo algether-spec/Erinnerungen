@@ -20,10 +20,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="style.css?v=1.0.9">
+    <link rel="stylesheet" href="style.css?v=1.0.12">
 
     <!-- Manifest -->
-    <link rel="manifest" href="manifest.json?v=1.0.9">
+    <link rel="manifest" href="manifest.json?v=1.0.12">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
 </head>
@@ -93,6 +93,14 @@
                 <button type="button"
                         id="add-all-button"
                         class="add-button">Übernehmen</button>
+
+                <div class="due-date-wrap">
+                    <button type="button"
+                            id="btn-due-date"
+                            class="due-date-button"
+                            title="Fälligkeitsdatum setzen">📅</button>
+                    <input type="date" id="due-date-input" class="due-date-input">
+                </div>
 
                 <button type="button"
                         id="btn-photo-ocr"
@@ -166,7 +174,7 @@
     </div>
 
     <div class="version-row">
-        <div class="version-badge" id="version-badge">v1.0.9</div>
+        <div class="version-badge" id="version-badge">v1.0.12</div>
     </div>
     <div class="version-subline">von Al.Gether</div>
     <div class="sync-status" id="sync-status">Sync: Lokal</div>
@@ -184,13 +192,13 @@
 
 </div>
 
-<script src="config.js?v=1.0.9"></script>
-<script src="utils.js?v=1.0.9"></script>
+<script src="config.js?v=1.0.12"></script>
+<script src="utils.js?v=1.0.12"></script>
 <script src="supabase-lib.js"></script>
-<script src="supabase.js?v=1.0.9"></script>
-<script src="sync.js?v=1.0.9"></script>
-<script src="ui.js?v=1.0.9"></script>
-<script src="app.js?v=1.0.9"></script>
+<script src="supabase.js?v=1.0.12"></script>
+<script src="sync.js?v=1.0.12"></script>
+<script src="ui.js?v=1.0.12"></script>
+<script src="app.js?v=1.0.12"></script>
 
 </body>
 </html>

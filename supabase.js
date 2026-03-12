@@ -301,7 +301,7 @@ async function ladenRemote() {
 
     const { data, error } = await supabaseClient
         .from(SUPABASE_TABLE)
-        .select("item_id, text, title, note, erledigt, position, created_at, entry_date")
+        .select("item_id, text, title, note, erledigt, position, created_at, entry_date, due_date")
         .eq("sync_code", currentSyncCode)
         .order("position", { ascending: true });
 
@@ -316,6 +316,7 @@ async function ladenRemote() {
         erledigt: Boolean(e.erledigt),
         createdAt: normalizeDateIso(e.created_at) || extractDateFromItemId(e.item_id),
         entryDate: normalizeDateIso(e.entry_date || e.created_at) || extractDateFromItemId(e.item_id),
+        dueDate: e.due_date ? String(e.due_date).slice(0, 10) : "",
         position: Number.isFinite(e.position) ? e.position : index
     }));
 }
@@ -346,7 +347,8 @@ async function speichernRemote(daten, options = {}) {
         entry_date:
             normalizeDateIso(e.entryDate || e.createdAt)
             || extractDateFromItemId(e.itemId)
-            || new Date().toISOString()
+            || new Date().toISOString(),
+        due_date: e.dueDate ? String(e.dueDate).slice(0, 10) : null
     }));
 
     const { error: upsertError } = await supabaseClient
