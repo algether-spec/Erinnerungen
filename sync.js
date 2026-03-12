@@ -287,6 +287,7 @@ function normalizeListData(daten) {
             const entryDate =
                 normalizeDateIso(e?.entryDate || e?.entry_date || e?.createdAt || e?.created_at)
                 || createdAt;
+            const dueDate = String(e?.dueDate || e?.due_date || "").trim().slice(0, 10);
             return {
                 itemId,
                 text: text || title,
@@ -295,6 +296,7 @@ function normalizeListData(daten) {
                 erledigt: Boolean(e?.erledigt),
                 createdAt,
                 entryDate,
+                dueDate,
                 position: Number.isFinite(e?.position) ? e.position : index
             };
         })
@@ -318,6 +320,7 @@ function listDataSignature(daten) {
             erledigt: e.erledigt,
             createdAt: e.createdAt || "",
             entryDate: e.entryDate || "",
+            dueDate: e.dueDate || "",
             position: e.position
         }))
     );
@@ -366,6 +369,7 @@ function ladenLokal() {
                 entryDate:
                     normalizeDateIso(e.entryDate || e.entry_date || e.createdAt || e.created_at)
                     || extractDateFromItemId(e.itemId || e.item_id),
+                dueDate: String(e.dueDate || e.due_date || "").trim().slice(0, 10),
                 position: Number.isFinite(e.position) ? e.position : index
             }))
             .filter(e => (e.text || e.title).trim().length > 0);
