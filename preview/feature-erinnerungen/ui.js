@@ -36,6 +36,11 @@ const inputErrorStatus = document.getElementById("input-error-status");
 const imageViewer      = document.getElementById("image-viewer");
 const imageViewerImg   = document.getElementById("image-viewer-img");
 const btnImageViewerClose = document.getElementById("btn-image-viewer-close");
+const photoCaptionArea    = document.getElementById("photo-caption-area");
+const photoCaptionPreview = document.getElementById("photo-caption-preview");
+const photoCaptionText    = document.getElementById("photo-caption-text");
+const btnPhotoCaptionSave = document.getElementById("btn-photo-caption-save");
+const btnPhotoCaptionCancel = document.getElementById("btn-photo-caption-cancel");
 const helpViewer          = document.getElementById("help-viewer");
 const btnHelpViewerClose  = document.getElementById("btn-help-viewer-close");
 const btnHelp             = document.getElementById("btn-help");
@@ -220,8 +225,20 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         };
 
         wrapper.appendChild(thumb);
-        wrapper.appendChild(openBtn);
-        wrapper.appendChild(deleteBtn);
+
+        const photoControls = document.createElement("div");
+        photoControls.className = "list-photo-controls";
+        photoControls.appendChild(openBtn);
+        photoControls.appendChild(deleteBtn);
+
+        if (entryNote) {
+            const noteSpan = document.createElement("span");
+            noteSpan.className = "list-photo-note";
+            noteSpan.textContent = entryNote;
+            photoControls.appendChild(noteSpan);
+        }
+
+        wrapper.appendChild(photoControls);
         li.appendChild(wrapper);
     } else {
         const textWrap = document.createElement("span");
@@ -514,6 +531,18 @@ async function optimizePhotoDataUrl(dataUrl) {
     }
 }
 
+let pendingPhotoSrc = "";
+
+function photoCaptionBereich(show) {
+    if (!photoCaptionArea) return;
+    photoCaptionArea.hidden = !show;
+    if (!show) {
+        pendingPhotoSrc = "";
+        if (photoCaptionPreview) photoCaptionPreview.src = "";
+        if (photoCaptionText) photoCaptionText.value = "";
+    }
+}
+
 async function addPhotoAsListItem(file) {
     if (!file) return;
     if (btnPhotoOcr) btnPhotoOcr.disabled = true;
@@ -522,13 +551,11 @@ async function addPhotoAsListItem(file) {
     try {
         const imageSrc = await readFileAsDataUrl(file);
         const optimizedImageSrc = await optimizePhotoDataUrl(imageSrc);
-        eintragAnlegen(IMAGE_ENTRY_PREFIX + optimizedImageSrc);
-        speichern();
-        if (multiInput?.value?.trim()) {
-            mikStatusSetzen("Foto gespeichert. Text bleibt im Feld.");
-        } else {
-            mikStatusSetzen("Foto zur Liste hinzugefügt.");
-        }
+        pendingPhotoSrc = optimizedImageSrc;
+        if (photoCaptionPreview) photoCaptionPreview.src = optimizedImageSrc;
+        if (photoCaptionText) { photoCaptionText.value = ""; }
+        photoCaptionBereich(true);
+        mikStatusSetzen("Beschreibung eingeben und Foto speichern.");
     } catch (err) {
         console.warn("Foto konnte nicht hinzugefuegt werden:", err);
         mikStatusSetzen("Foto konnte nicht gelesen werden.");
@@ -541,6 +568,21 @@ async function addPhotoAsListItem(file) {
         }
     }
 }
+
+function photoCaptionSpeichern() {
+    if (!pendingPhotoSrc) return;
+    const note = photoCaptionText ? photoCaptionText.value.trim() : "";
+    eintragAnlegen({ text: IMAGE_ENTRY_PREFIX + pendingPhotoSrc, note });
+    speichern();
+    photoCaptionBereich(false);
+    mikStatusSetzen("Foto zur Liste hinzugefügt.");
+}
+
+if (btnPhotoCaptionSave) btnPhotoCaptionSave.onclick = photoCaptionSpeichern;
+if (btnPhotoCaptionCancel) btnPhotoCaptionCancel.onclick = () => {
+    photoCaptionBereich(false);
+    mikStatusSetzen("Foto abgebrochen.");
+};
 
 if (btnPhotoOcr && photoOcrInput) {
     btnPhotoOcr.onclick = () => photoOcrInput.click();
