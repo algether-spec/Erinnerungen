@@ -1084,22 +1084,25 @@ async function exportAusfuehren() {
     const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
     const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
 
-    // Fotos via navigator.share teilen (iOS unterstützt kein a.download in PWAs)
+    const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
+
+    // Mit Fotos: navigator.share – wenn Nutzer Mail wählt, werden title→Betreff, text→Body, files→Anhang
     if (photoEntries.length > 0) {
         const photoFiles = photoEntries.map((e, i) =>
             exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
         );
         if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                await navigator.share({ files: photoFiles, title: exportTitle });
+                await navigator.share({ files: photoFiles, text, title: exportTitle });
+                return;
             } catch (err) {
                 if (err?.name === "AbortError") return;
+                // canShare meldet true aber share schlägt fehl → mailto-Fallback
             }
         }
     }
 
-    // Immer: mailto via location.href (funktioniert auch nach await auf iOS)
-    const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
+    // Ohne Fotos (oder Fallback): mailto
     window.location.href = mailtoUrl;
 }
 
