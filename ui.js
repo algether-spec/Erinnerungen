@@ -845,73 +845,98 @@ function exportDataUrlToFile(dataUrl, name) {
     return new File([bytes], name, { type: mime });
 }
 
-function exportBuildText(exportDate, entries, opts) {
-    const offene    = entries.filter(e => !e.erledigt && !e.isPhoto);
-    const erledigt  = entries.filter(e =>  e.erledigt && !e.isPhoto);
-    const fotos     = entries.filter(e => e.isPhoto);
+function exportFormatIsoDate(isoDate) {
+    if (!isoDate) return "";
+    try {
+        return new Intl.DateTimeFormat("de-AT", {
+            day: "2-digit", month: "2-digit", year: "numeric"
+        }).format(new Date(isoDate + "T12:00:00"));
+    } catch { return isoDate; }
+}
+
+function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
+    const today  = getTodayDateString();
+    const offene   = entries.filter(e => !e.erledigt && !e.isPhoto);
+    const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
+    const fotos    = entries.filter(e => e.isPhoto);
 
     const buildLine = (prefix, e) => {
-        let line = prefix + e.title;
-        if (opts.incEntryDate && e.entryDate) line += ` (${e.entryDate})`;
-        if (opts.incDueDate   && e.dueDate)   line += ` [Fällig: ${e.dueDate}]`;
+        const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
+        let line = (overdue ? "⚠️ " : prefix) + e.title;
+        if (opts.incEntryDate && e.entryDate) line += ` (Erfasst: ${exportFormatIsoDate(e.entryDate)})`;
+        if (opts.incDueDate   && e.dueDate)   line += ` [Fällig: ${exportFormatIsoDate(e.dueDate)}]`;
         return line;
     };
 
-    return [
+    const lines = [
         "Erinnerungen",
-        `Datum: ${exportDate}`,
-        `Eintraege: ${entries.length}`,
-        "────────────",
-        "",
-        "Offen",
-        ...(offene.length   ? offene.map(e => buildLine("• ", e))   : ["(keine offenen Eintraege)"]),
-        "",
-        "Erledigt",
-        ...(erledigt.length ? erledigt.map(e => buildLine("✔ ", e)) : ["(keine erledigten Eintraege)"]),
-        ...(opts.incPhotos && fotos.length
-            ? ["", "Fotos", ...fotos.map((e, i) =>
-                `📷 Foto ${i + 1}${opts.incPhotoNote && e.note ? ": " + e.note : ""}`)
-              ]
-            : [])
-    ].join("\n");
+        exportDateLong,
+        `${entries.length} Einträge`,
+        "────────────"
+    ];
+
+    if (offene.length) {
+        lines.push("", "Offen");
+        offene.forEach(e => lines.push(buildLine("• ", e)));
+    }
+    if (erledigt.length) {
+        lines.push("", "Erledigt");
+        erledigt.forEach(e => lines.push(buildLine("✔ ", e)));
+    }
+    if (opts.incPhotos && fotos.length) {
+        lines.push("", "Fotos");
+        fotos.forEach((e, i) =>
+            lines.push(`📷 Foto ${i + 1}${opts.incPhotoNote && e.note ? ": " + e.note : ""}`)
+        );
+    }
+
+    return lines.join("\n");
 }
 
-function exportAsHtmlDownload(exportDate, entries, opts) {
-    const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
+    const esc   = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const today = getTodayDateString();
     const offene   = entries.filter(e => !e.erledigt && !e.isPhoto);
     const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
     const fotos    = opts.incPhotos ? entries.filter(e => e.isPhoto) : [];
 
     const buildDates = e => {
         let d = "";
-        if (opts.incEntryDate && e.entryDate) d += `<div class="date-meta">Erfasst: ${esc(e.entryDate)}</div>`;
-        if (opts.incDueDate   && e.dueDate)   d += `<div class="date-meta">Fällig: ${esc(e.dueDate)}</div>`;
+        if (opts.incEntryDate && e.entryDate) d += `<div class="date-meta">Erfasst: ${esc(exportFormatIsoDate(e.entryDate))}</div>`;
+        if (opts.incDueDate   && e.dueDate)   d += `<div class="date-meta">Fällig: ${esc(exportFormatIsoDate(e.dueDate))}</div>`;
         return d;
+    };
+
+    const buildItem = (e, cls = "") => {
+        const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
+        const warn = overdue ? `<span class="overdue-warn">⚠️</span> ` : "";
+        return `<li${cls ? ` class="${cls}"` : ""}${overdue ? ' style="border-left-color:#dc2626"' : ""}>${warn}${esc(e.title)}${buildDates(e)}</li>`;
     };
 
     let html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Erinnerungen ${exportDate}</title>
+<title>Erinnerungen - ${esc(exportDateShort)}</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:16px;background:#f8f4ef}
-h1{color:#c2410c}h2{color:#374151;font-size:15px;margin-top:16px}
+h1{color:#c2410c;margin-bottom:4px}h2{color:#374151;font-size:15px;margin-top:16px}
 ul{list-style:none;padding:0}
 li{background:#fff;padding:10px 14px;border-radius:10px;margin-bottom:6px;border-left:5px solid #c2410c}
 li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
 .foto{display:flex;gap:10px;align-items:flex-start}
 .foto img{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0}
 .foto-note{font-size:13px;color:#374151}
-.meta{color:#6b7280;font-size:12px;margin-bottom:12px}
+.meta{color:#6b7280;font-size:13px;margin-bottom:12px}
 .date-meta{font-size:12px;color:#94a3b8;margin-top:2px}
+.overdue-warn{font-style:normal}
 </style></head><body>
 <h1>Erinnerungen</h1>
-<p class="meta">Exportiert: ${exportDate} · Einträge: ${entries.length}</p>`;
+<p class="meta">${esc(exportDateLong)} · ${entries.length} Einträge</p>`;
 
     if (offene.length) {
-        html += `<h2>Offen</h2><ul>${offene.map(e => `<li>${esc(e.title)}${buildDates(e)}</li>`).join("")}</ul>`;
+        html += `<h2>Offen</h2><ul>${offene.map(e => buildItem(e)).join("")}</ul>`;
     }
     if (erledigt.length) {
-        html += `<h2>Erledigt</h2><ul>${erledigt.map(e => `<li class="done">${esc(e.title)}${buildDates(e)}</li>`).join("")}</ul>`;
+        html += `<h2>Erledigt</h2><ul>${erledigt.map(e => buildItem(e, "done")).join("")}</ul>`;
     }
     if (fotos.length) {
         html += `<h2>Fotos (${fotos.length})</h2><ul>`;
@@ -928,7 +953,7 @@ li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href = url;
-    a.download = `erinnerungen-${exportDate.replace(/\./g, "-")}.html`;
+    a.download = `erinnerungen-${exportDateShort.replace(/\./g, "-")}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1010,12 +1035,17 @@ async function exportAusfuehren() {
         return;
     }
 
-    const exportDate = new Intl.DateTimeFormat("de-AT", {
+    const now = new Date();
+    const exportDateShort = new Intl.DateTimeFormat("de-AT", {
         day: "2-digit", month: "2-digit", year: "numeric"
-    }).format(new Date());
+    }).format(now);
+    const exportDateLong = new Intl.DateTimeFormat("de-AT", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }).format(now);
+    const exportTitle = `Erinnerungen - ${exportDateShort}`;
 
     const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
-    const text = exportBuildText(exportDate, selectedEntries, opts);
+    const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
 
     if (photoEntries.length > 0) {
         const photoFiles = photoEntries.map((e, i) =>
@@ -1023,19 +1053,19 @@ async function exportAusfuehren() {
         );
         if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                await navigator.share({ files: photoFiles, text, title: "Erinnerungen" });
+                await navigator.share({ files: photoFiles, text, title: exportTitle });
                 return;
             } catch (err) {
                 if (err?.name === "AbortError") return;
             }
         }
-        exportAsHtmlDownload(exportDate, selectedEntries, opts);
+        exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
         return;
     }
 
     if (navigator.share) {
         try {
-            await navigator.share({ title: "Erinnerungen", text });
+            await navigator.share({ title: exportTitle, text });
             return;
         } catch (err) {
             if (err?.name === "AbortError") return;
