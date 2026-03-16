@@ -48,11 +48,11 @@ const btnHelp             = document.getElementById("btn-help");
 const exportModal           = document.getElementById("export-modal");
 const btnExportModalClose   = document.getElementById("btn-export-modal-close");
 const btnExportCancel       = document.getElementById("btn-export-cancel");
-const btnExportRun          = document.getElementById("btn-export-run");
+const btnExportHtml         = document.getElementById("btn-export-html");
+const btnExportMail         = document.getElementById("btn-export-mail");
 const btnExportSelectAll    = document.getElementById("btn-export-select-all");
 const btnExportDeselectAll  = document.getElementById("btn-export-deselect-all");
 const exportEntryList       = document.getElementById("export-entry-list");
-const exportIncPhotos       = document.getElementById("export-inc-photos");
 const exportIncEntryDate    = document.getElementById("export-inc-entry-date");
 const exportIncDueDate      = document.getElementById("export-inc-due-date");
 const exportIncPhotoNote    = document.getElementById("export-inc-photo-note");
@@ -925,14 +925,13 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
         if (e.isPhoto) {
             const src     = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
             const hasNote = opts.incPhotoNote && e.note;
-            const imgRadius = hasNote ? "8px 8px 0 0" : "8px";
-            const caption = hasNote
-                ? `<div style="background:#f1f5f9;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;padding:8px 12px;font-size:13px;color:#374151;font-style:italic">📝 ${esc(e.note)}</div>` : "";
+            const overlay = hasNote
+                ? `<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;padding:6px 10px;font-size:13px;line-height:1.3">📝 ${esc(e.note)}</div>` : "";
             const meta = buildMeta(e);
             return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
-  <div style="border-radius:8px;overflow:hidden;margin-bottom:${meta ? "6px" : "0"}">
-    <img src="${src}" style="width:100%;max-width:480px;border-radius:${imgRadius};display:block">
-    ${caption}
+  <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:${meta ? "6px" : "0"}">
+    <img src="${src}" style="width:100%;max-width:480px;border-radius:8px;display:block">
+    ${overlay}
   </div>
   ${meta ? `<div>${meta}</div>` : ""}
 </li>`;
@@ -1052,26 +1051,21 @@ function exportModalSchliessen() {
     if (exportModal) exportModal.hidden = true;
 }
 
-async function exportAusfuehren() {
-    if (!exportEntryList) return;
+function exportDatenVorbereiten() {
+    if (!exportEntryList) return null;
+    const selectedEntries = [...exportEntryList.querySelectorAll("li")]
+        .filter(li => li.querySelector("input[type=checkbox]")?.checked)
+        .map(li => li._exportEntry);
+    if (!selectedEntries.length) {
+        alert("Keine Einträge ausgewählt.");
+        return null;
+    }
     const opts = {
-        incPhotos:    exportIncPhotos?.checked    ?? true,
+        incPhotos:    true,
         incEntryDate: exportIncEntryDate?.checked ?? true,
         incDueDate:   exportIncDueDate?.checked   ?? true,
         incPhotoNote: exportIncPhotoNote?.checked  ?? true
     };
-
-    const selectedEntries = [...exportEntryList.querySelectorAll("li")]
-        .filter(li => li.querySelector("input[type=checkbox]")?.checked)
-        .map(li => li._exportEntry);
-
-    exportModalSchliessen();
-
-    if (!selectedEntries.length) {
-        alert("Keine Einträge ausgewählt.");
-        return;
-    }
-
     const now = new Date();
     const exportDateShort = new Intl.DateTimeFormat("de-AT", {
         day: "2-digit", month: "2-digit", year: "numeric"
@@ -1079,31 +1073,24 @@ async function exportAusfuehren() {
     const exportDateLong = new Intl.DateTimeFormat("de-AT", {
         weekday: "long", day: "numeric", month: "long", year: "numeric"
     }).format(now);
-    const exportTitle = `Erinnerungen - ${exportDateShort}`;
+    return { selectedEntries, opts, exportDateShort, exportDateLong };
+}
 
-    const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
-    const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
+function exportAlsHtml() {
+    const d = exportDatenVorbereiten();
+    if (!d) return;
+    exportModalSchliessen();
+    exportAsHtmlDownload(d.exportDateShort, d.exportDateLong, d.selectedEntries, d.opts);
+}
 
-    const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
-
-    // Mit Fotos: navigator.share – wenn Nutzer Mail wählt, werden title→Betreff, text→Body, files→Anhang
-    if (photoEntries.length > 0) {
-        const photoFiles = photoEntries.map((e, i) =>
-            exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
-        );
-        if (navigator.canShare?.({ files: photoFiles })) {
-            try {
-                await navigator.share({ files: photoFiles, text, title: exportTitle });
-                return;
-            } catch (err) {
-                if (err?.name === "AbortError") return;
-                // canShare meldet true aber share schlägt fehl → mailto-Fallback
-            }
-        }
-    }
-
-    // Ohne Fotos (oder Fallback): mailto
-    window.location.href = mailtoUrl;
+function exportAlsMail() {
+    const d = exportDatenVorbereiten();
+    if (!d) return;
+    exportModalSchliessen();
+    const textEntries = d.selectedEntries.filter(e => !e.isPhoto);
+    const text = exportBuildText(d.exportDateShort, d.exportDateLong, textEntries, { ...d.opts, incPhotos: false });
+    const exportTitle = `Erinnerungen - ${d.exportDateShort}`;
+    window.location.href = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
 }
 
 if (btnExport)           btnExport.onclick           = exportModalOeffnen;
@@ -1114,7 +1101,8 @@ if (exportModal) {
         if (event.target === exportModal) exportModalSchliessen();
     };
 }
-if (btnExportRun) btnExportRun.onclick = () => void exportAusfuehren();
+if (btnExportHtml) btnExportHtml.onclick = exportAlsHtml;
+if (btnExportMail) btnExportMail.onclick = exportAlsMail;
 if (btnExportSelectAll) {
     btnExportSelectAll.onclick = () =>
         exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
