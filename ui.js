@@ -15,6 +15,7 @@ const syncCodeCompact    = document.getElementById("sync-code-compact");
 const btnSyncCodeDisplay = document.getElementById("btn-sync-code-display");
 const btnSyncCodeShare   = document.getElementById("btn-sync-code-share");
 const btnSyncConnect     = document.getElementById("btn-sync-connect");
+const btnSyncCodeChange  = document.getElementById("btn-sync-code-change");
 const versionBadge   = document.getElementById("version-badge");
 const syncStatus     = document.getElementById("sync-status");
 const syncDebug      = document.getElementById("sync-debug");
@@ -25,7 +26,6 @@ const authStatus     = document.getElementById("auth-status");
 
 const multiInput       = document.getElementById("multi-line-input");
 const multiAdd         = document.getElementById("add-all-button");
-const dueDateInput     = document.getElementById("due-date-input");
 const btnPhotoOcr      = document.getElementById("btn-photo-ocr");
 const photoOcrInput    = document.getElementById("photo-ocr-input");
 const btnClearInput    = document.getElementById("btn-clear-input");
@@ -36,9 +36,26 @@ const inputErrorStatus = document.getElementById("input-error-status");
 const imageViewer      = document.getElementById("image-viewer");
 const imageViewerImg   = document.getElementById("image-viewer-img");
 const btnImageViewerClose = document.getElementById("btn-image-viewer-close");
+const photoCaptionArea    = document.getElementById("photo-caption-area");
+const photoCaptionPreview = document.getElementById("photo-caption-preview");
+const photoCaptionText    = document.getElementById("photo-caption-text");
+const btnPhotoCaptionSave = document.getElementById("btn-photo-caption-save");
+const btnPhotoCaptionCancel = document.getElementById("btn-photo-caption-cancel");
 const helpViewer          = document.getElementById("help-viewer");
 const btnHelpViewerClose  = document.getElementById("btn-help-viewer-close");
 const btnHelp             = document.getElementById("btn-help");
+
+const exportModal           = document.getElementById("export-modal");
+const btnExportModalClose   = document.getElementById("btn-export-modal-close");
+const btnExportCancel       = document.getElementById("btn-export-cancel");
+const btnExportRun          = document.getElementById("btn-export-run");
+const btnExportSelectAll    = document.getElementById("btn-export-select-all");
+const btnExportDeselectAll  = document.getElementById("btn-export-deselect-all");
+const exportEntryList       = document.getElementById("export-entry-list");
+const exportIncPhotos       = document.getElementById("export-inc-photos");
+const exportIncEntryDate    = document.getElementById("export-inc-entry-date");
+const exportIncDueDate      = document.getElementById("export-inc-due-date");
+const exportIncPhotoNote    = document.getElementById("export-inc-photo-note");
 
 const SpeechRecognitionCtor =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -220,8 +237,68 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         };
 
         wrapper.appendChild(thumb);
-        wrapper.appendChild(openBtn);
-        wrapper.appendChild(deleteBtn);
+
+        const photoControls = document.createElement("div");
+        photoControls.className = "list-photo-controls";
+        photoControls.appendChild(openBtn);
+        photoControls.appendChild(deleteBtn);
+        wrapper.appendChild(photoControls);
+
+        const noteWrap = document.createElement("div");
+        noteWrap.className = "list-photo-note-wrap";
+
+        const noteDisplay = document.createElement("span");
+        noteDisplay.className = "list-photo-note" + (entryNote ? "" : " list-photo-note-empty");
+        noteDisplay.textContent = entryNote || "Notiz hinzufügen…";
+        noteWrap.appendChild(noteDisplay);
+
+        noteDisplay.addEventListener("click", event => {
+            event.stopPropagation();
+            if (noteWrap.querySelector("textarea")) return;
+
+            const ta = document.createElement("textarea");
+            ta.className = "list-photo-note-edit";
+            ta.value = li.dataset.note || "";
+            ta.rows = 2;
+            ta.placeholder = "Notiz eingeben…";
+
+            const confirmBtn = document.createElement("button");
+            confirmBtn.type = "button";
+            confirmBtn.className = "list-photo-note-confirm";
+            confirmBtn.textContent = "Fertig";
+
+            const saveNote = () => {
+                const newNote = ta.value.trim();
+                li.dataset.note = newNote;
+                noteDisplay.textContent = newNote || "Notiz hinzufügen…";
+                noteDisplay.classList.toggle("list-photo-note-empty", !newNote);
+                noteDisplay.hidden = false;
+                noteWrap.removeChild(ta);
+                noteWrap.removeChild(confirmBtn);
+                speichern(true);
+            };
+
+            const cancelEdit = () => {
+                noteDisplay.hidden = false;
+                noteWrap.removeChild(ta);
+                noteWrap.removeChild(confirmBtn);
+            };
+
+            confirmBtn.onclick = event => { event.stopPropagation(); saveNote(); };
+            ta.addEventListener("keydown", event => {
+                if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveNote(); }
+                if (event.key === "Escape") cancelEdit();
+            });
+            ta.addEventListener("pointerdown", e => e.stopPropagation());
+
+            noteDisplay.hidden = true;
+            noteWrap.appendChild(ta);
+            noteWrap.appendChild(confirmBtn);
+            ta.focus();
+        });
+
+        wrapper.appendChild(noteWrap);
+
         li.appendChild(wrapper);
     } else {
         const textWrap = document.createElement("span");
@@ -242,19 +319,59 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         li.appendChild(textWrap);
     }
 
-    const dateSpan = document.createElement("span");
-    dateSpan.className = "list-item-date";
-    if (normalizedDueDate) {
-        dateSpan.textContent = formatDueDate(normalizedDueDate);
-        if (!inputErledigt) {
-            const today = getTodayDateString();
-            if (normalizedDueDate < today) li.classList.add("overdue");
-            else if (normalizedDueDate === today) li.classList.add("due-today");
+    const datesWrap = document.createElement("div");
+    datesWrap.className = "list-item-dates";
+
+    const entryDateSpan = document.createElement("span");
+    entryDateSpan.className = "list-item-entry-date";
+    entryDateSpan.textContent = formatEntryDate(normalizedEntryDate);
+    datesWrap.appendChild(entryDateSpan);
+
+    const dueDateWrap = document.createElement("div");
+    dueDateWrap.className = "list-item-due-wrap";
+
+    const dueDateBtn = document.createElement("button");
+    dueDateBtn.type = "button";
+    dueDateBtn.className = "list-item-due-btn";
+
+    const dueDateHidden = document.createElement("input");
+    dueDateHidden.type = "date";
+    dueDateHidden.className = "list-item-due-input";
+    if (normalizedDueDate) dueDateHidden.value = normalizedDueDate;
+
+    function updateDueDateDisplay() {
+        const val = dueDateHidden.value;
+        li.dataset.dueDate = val;
+        if (val) {
+            dueDateBtn.textContent = formatDueDate(val);
+            dueDateBtn.classList.add("has-date");
+            if (!li.classList.contains("erledigt")) {
+                const today = getTodayDateString();
+                li.classList.toggle("overdue", val < today);
+                li.classList.toggle("due-today", val === today);
+            }
+        } else {
+            dueDateBtn.textContent = "📅";
+            dueDateBtn.classList.remove("has-date");
+            li.classList.remove("overdue", "due-today");
         }
-    } else {
-        dateSpan.textContent = formatEntryDate(normalizedEntryDate);
     }
-    li.appendChild(dateSpan);
+    updateDueDateDisplay();
+
+    dueDateBtn.onclick = event => {
+        event.stopPropagation();
+        try { dueDateHidden.showPicker(); } catch { dueDateHidden.click(); }
+    };
+    dueDateHidden.addEventListener("pointerdown", e => e.stopPropagation());
+    dueDateHidden.onchange = () => {
+        updateDueDateDisplay();
+        speichern(true);
+    };
+
+    dueDateWrap.appendChild(dueDateBtn);
+    dueDateWrap.appendChild(dueDateHidden);
+    datesWrap.appendChild(dueDateWrap);
+    li.appendChild(datesWrap);
 
     if (inputErledigt) li.classList.add("erledigt");
 
@@ -400,16 +517,14 @@ function mehrzeilenSpeichern() {
     const text = multiInput.value.trim();
     if (!text) return;
 
-    const dueDate = dueDateInput ? String(dueDateInput.value || "").trim() : "";
     text.split("\n")
         .map(l => l.trim())
         .filter(Boolean)
-        .forEach(item => eintragAnlegen({ text: item, dueDate }));
+        .forEach(item => eintragAnlegen({ text: item }));
 
     speichern();
     multiInput.value = "";
     autoResize();
-    if (dueDateInput) { dueDateInput.value = ""; dueDateButtonAktualisieren(); }
     multiInput.blur();
 
     if (isListening) {
@@ -446,22 +561,6 @@ function clearInputBuffer(stopDictation = false) {
 }
 
 if (multiAdd) multiAdd.onclick = mehrzeilenSpeichern;
-
-/* --- Fälligkeitsdatum-Button ------------------------------------ */
-
-function dueDateButtonAktualisieren() {
-    const btn = document.getElementById("btn-due-date");
-    if (!btn || !dueDateInput) return;
-    const hasDate = Boolean(dueDateInput.value);
-    btn.classList.toggle("has-date", hasDate);
-    btn.title = hasDate
-        ? `Fällig: ${formatDueDate(dueDateInput.value)} (tippen zum Ändern)`
-        : "Fälligkeitsdatum setzen";
-}
-
-if (dueDateInput) {
-    dueDateInput.addEventListener("change", dueDateButtonAktualisieren);
-}
 
 if (btnClearInput) {
     btnClearInput.onclick = () => clearInputBuffer(false);
@@ -514,6 +613,18 @@ async function optimizePhotoDataUrl(dataUrl) {
     }
 }
 
+let pendingPhotoSrc = "";
+
+function photoCaptionBereich(show) {
+    if (!photoCaptionArea) return;
+    photoCaptionArea.hidden = !show;
+    if (!show) {
+        pendingPhotoSrc = "";
+        if (photoCaptionPreview) photoCaptionPreview.src = "";
+        if (photoCaptionText) photoCaptionText.value = "";
+    }
+}
+
 async function addPhotoAsListItem(file) {
     if (!file) return;
     if (btnPhotoOcr) btnPhotoOcr.disabled = true;
@@ -522,13 +633,11 @@ async function addPhotoAsListItem(file) {
     try {
         const imageSrc = await readFileAsDataUrl(file);
         const optimizedImageSrc = await optimizePhotoDataUrl(imageSrc);
-        eintragAnlegen(IMAGE_ENTRY_PREFIX + optimizedImageSrc);
-        speichern();
-        if (multiInput?.value?.trim()) {
-            mikStatusSetzen("Foto gespeichert. Text bleibt im Feld.");
-        } else {
-            mikStatusSetzen("Foto zur Liste hinzugefügt.");
-        }
+        pendingPhotoSrc = optimizedImageSrc;
+        if (photoCaptionPreview) photoCaptionPreview.src = optimizedImageSrc;
+        if (photoCaptionText) { photoCaptionText.value = ""; }
+        photoCaptionBereich(true);
+        mikStatusSetzen("Beschreibung eingeben und Foto speichern.");
     } catch (err) {
         console.warn("Foto konnte nicht hinzugefuegt werden:", err);
         mikStatusSetzen("Foto konnte nicht gelesen werden.");
@@ -541,6 +650,21 @@ async function addPhotoAsListItem(file) {
         }
     }
 }
+
+function photoCaptionSpeichern() {
+    if (!pendingPhotoSrc) return;
+    const note = photoCaptionText ? photoCaptionText.value.trim() : "";
+    eintragAnlegen({ text: IMAGE_ENTRY_PREFIX + pendingPhotoSrc, note });
+    speichern();
+    photoCaptionBereich(false);
+    mikStatusSetzen("Foto zur Liste hinzugefügt.");
+}
+
+if (btnPhotoCaptionSave) btnPhotoCaptionSave.onclick = photoCaptionSpeichern;
+if (btnPhotoCaptionCancel) btnPhotoCaptionCancel.onclick = () => {
+    photoCaptionBereich(false);
+    mikStatusSetzen("Foto abgebrochen.");
+};
 
 if (btnPhotoOcr && photoOcrInput) {
     btnPhotoOcr.onclick = () => photoOcrInput.click();
@@ -715,55 +839,287 @@ if (btnMic) btnMic.onclick = toggleDictation;
 
 /* --- Export ----------------------------------------------------- */
 
-if (btnExport) {
-    btnExport.onclick = async () => {
-        const textEntries = [...liste.querySelectorAll("li")]
-            .map(li => ({
-                erledigt: li.classList.contains("erledigt"),
-                raw: String(li.dataset.rawText || li.dataset.text || "")
-            }))
-            .filter(item => item.raw && !item.raw.startsWith(IMAGE_ENTRY_PREFIX));
+function exportDataUrlToFile(dataUrl, name) {
+    const [header, base64] = dataUrl.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return new File([bytes], name, { type: mime });
+}
 
-        const offeneLines = textEntries
-            .filter(item => !item.erledigt)
-            .map(item => "• " + item.raw);
-        const erledigteLines = textEntries
-            .filter(item => item.erledigt)
-            .map(item => "✔ " + item.raw);
+function exportFormatIsoDate(isoDate) {
+    if (!isoDate) return "";
+    try {
+        return new Intl.DateTimeFormat("de-AT", {
+            day: "2-digit", month: "2-digit", year: "numeric"
+        }).format(new Date(isoDate + "T12:00:00"));
+    } catch { return isoDate; }
+}
 
-        const exportDate = new Intl.DateTimeFormat("de-AT", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric"
-        }).format(new Date());
+function exportFormatIsoDateShort(isoDate) {
+    if (!isoDate) return "";
+    try {
+        return new Intl.DateTimeFormat("de-AT", {
+            day: "2-digit", month: "2-digit"
+        }).format(new Date(isoDate + "T12:00:00"));
+    } catch { return isoDate; }
+}
 
-        const text = [
-            "Erinnerungen",
-            `Datum: ${exportDate}`,
-            `Eintraege: ${textEntries.length}`,
-            "────────────",
-            "",
-            "Offen",
-            ...(offeneLines.length ? offeneLines : ["(keine offenen Eintraege)"]),
-            "",
-            "Erledigt",
-            ...(erledigteLines.length ? erledigteLines : ["(keine erledigten Eintraege)"])
-        ].join("\n");
+function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
+    const today  = getTodayDateString();
+    const offene   = entries.filter(e => !e.erledigt && (!e.isPhoto || opts.incPhotos));
+    const erledigt = entries.filter(e =>  e.erledigt && (!e.isPhoto || opts.incPhotos));
 
-        if (navigator.share) {
+    const buildLine = e => {
+        const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
+        const prefix  = e.isPhoto ? "📸" : e.erledigt ? "✔" : "•";
+        const warn    = overdue ? " ⚠️" : "";
+        const title   = e.isPhoto ? (e.note || "Foto") : e.title;
+        const parts   = [`${prefix}${warn} ${title}`];
+        if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
+        if (opts.incDueDate   && e.dueDate)   parts.push(`Fällig: ${exportFormatIsoDateShort(e.dueDate)}`);
+        return parts.join(" | ");
+    };
+
+    const lines = [
+        "Erinnerungen",
+        exportDateLong,
+        `${entries.length} Einträge`,
+        "────────────"
+    ];
+
+    if (offene.length) {
+        lines.push("", "Offen");
+        offene.forEach(e => lines.push(buildLine(e)));
+    }
+    if (erledigt.length) {
+        lines.push("", "Erledigt");
+        erledigt.forEach(e => lines.push(buildLine(e)));
+    }
+
+    lines.push("", "────────────", "Gesendet von Erinnerungen App – Al.Gether");
+    return lines.join("\n");
+}
+
+function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
+    const esc   = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const today = getTodayDateString();
+    const offene   = entries.filter(e => !e.erledigt && (!e.isPhoto || opts.incPhotos));
+    const erledigt = entries.filter(e =>  e.erledigt && (!e.isPhoto || opts.incPhotos));
+
+    const buildMeta = e => {
+        const parts = [];
+        if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
+        if (opts.incDueDate   && e.dueDate) {
+            const overdue = e.dueDate < today && !e.erledigt;
+            const isToday = e.dueDate === today && !e.erledigt;
+            const col = overdue ? "#dc2626" : isToday ? "#ea580c" : "#64748b";
+            parts.push(`<span style="color:${col};font-weight:600">Fällig: ${esc(exportFormatIsoDateShort(e.dueDate))}${overdue ? " ⚠️" : ""}</span>`);
+        }
+        return parts.length ? `<span style="color:#94a3b8;font-size:12px;margin-left:6px">${parts.join(" | ")}</span>` : "";
+    };
+
+    const buildItem = (e, done = false) => {
+        const overdue   = e.dueDate && e.dueDate < today && !e.erledigt;
+        const borderCol = done ? "#6d28d9" : overdue ? "#dc2626" : "#c2410c";
+
+        if (e.isPhoto) {
+            const src     = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const hasNote = opts.incPhotoNote && e.note;
+            const imgRadius = hasNote ? "8px 8px 0 0" : "8px";
+            const caption = hasNote
+                ? `<div style="background:#f1f5f9;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;padding:8px 12px;font-size:13px;color:#374151;font-style:italic">📝 ${esc(e.note)}</div>` : "";
+            const meta = buildMeta(e);
+            return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <div style="border-radius:8px;overflow:hidden;margin-bottom:${meta ? "6px" : "0"}">
+    <img src="${src}" style="width:100%;max-width:480px;border-radius:${imgRadius};display:block">
+    ${caption}
+  </div>
+  ${meta ? `<div>${meta}</div>` : ""}
+</li>`;
+        }
+
+        const titleCol = done ? "#9ca3af" : overdue ? "#dc2626" : "#1e293b";
+        const titleDec = done ? "text-decoration:line-through;" : "";
+        const prefix   = done ? "✔ " : "• ";
+        return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <span style="${titleDec}font-weight:600;color:${titleCol}">${prefix}${esc(e.title)}</span>${buildMeta(e)}
+</li>`;
+    };
+
+    const sectionHtml = (title, icon, items, done = false) => {
+        if (!items.length) return "";
+        return `
+<div style="margin-top:24px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #e5e7eb">
+    <span style="font-size:18px">${icon}</span>
+    <h2 style="margin:0;font-size:16px;font-weight:700;color:#374151">${title} <span style="color:#94a3b8;font-weight:400;font-size:14px">(${items.length})</span></h2>
+  </div>
+  <ul style="list-style:none;padding:0;margin:0">${items.map(e => buildItem(e, done)).join("")}</ul>
+</div>`;
+    };
+
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Erinnerungen - ${esc(exportDateShort)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:16px">
+
+  <div style="background:linear-gradient(135deg,#7c2d12,#c2410c,#ea580c);border-radius:16px;padding:24px 20px;margin-bottom:20px;color:#fff">
+    <div style="font-size:32px;margin-bottom:6px">🧠</div>
+    <h1 style="margin:0 0 4px;font-size:26px;font-weight:800;letter-spacing:0.3px">Erinnerungen</h1>
+    <p style="margin:0;font-size:14px;opacity:0.9">${esc(exportDateLong)}</p>
+    <p style="margin:8px 0 0;font-size:13px;opacity:0.75">${entries.length} Einträge</p>
+  </div>
+
+  ${sectionHtml("Offen", "📋", offene, false)}
+  ${sectionHtml("Erledigt", "✅", erledigt, true)}
+
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:12px">
+    Gesendet von <strong style="color:#64748b">Erinnerungen App</strong> – Al.Gether
+  </div>
+
+</div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = `erinnerungen-${exportDateShort.replace(/\./g, "-")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function exportListItemsFromListe() {
+    return [...liste.querySelectorAll("li")].map(li => {
+        const raw = String(li.dataset.rawText || li.dataset.text || "");
+        return {
+            erledigt:  li.classList.contains("erledigt"),
+            raw,
+            title:     String(li.dataset.title || raw).trim(),
+            note:      String(li.dataset.note || "").trim(),
+            entryDate: String(li.dataset.entryDate || "").slice(0, 10),
+            dueDate:   String(li.dataset.dueDate || "").slice(0, 10),
+            isPhoto:   raw.startsWith(IMAGE_ENTRY_PREFIX)
+        };
+    });
+}
+
+function exportModalFuellenEintraege(filter) {
+    if (!exportEntryList) return;
+    const alle = exportListItemsFromListe();
+    const gefiltert = filter === "open"
+        ? alle.filter(e => !e.erledigt)
+        : filter === "done"
+            ? alle.filter(e =>  e.erledigt)
+            : alle;
+
+    exportEntryList.innerHTML = "";
+    gefiltert.forEach(e => {
+        const li    = document.createElement("li");
+        li.className = "export-entry-item";
+        const label = document.createElement("label");
+        label.className = "export-entry-label";
+        const cb    = document.createElement("input");
+        cb.type     = "checkbox";
+        cb.checked  = true;
+        const span  = document.createElement("span");
+        span.textContent = e.isPhoto
+            ? "📸" + (e.note ? " " + e.note : " Foto")
+            : (e.erledigt ? "✔ " : "• ") + e.title;
+        label.appendChild(cb);
+        label.appendChild(span);
+        li.appendChild(label);
+        li._exportEntry = e;
+        exportEntryList.appendChild(li);
+    });
+}
+
+function exportModalOeffnen() {
+    const activeFilter = document.querySelector("input[name=export-filter]:checked")?.value || "all";
+    exportModalFuellenEintraege(activeFilter);
+    if (exportModal) exportModal.hidden = false;
+}
+
+function exportModalSchliessen() {
+    if (exportModal) exportModal.hidden = true;
+}
+
+async function exportAusfuehren() {
+    if (!exportEntryList) return;
+    const opts = {
+        incPhotos:    exportIncPhotos?.checked    ?? true,
+        incEntryDate: exportIncEntryDate?.checked ?? true,
+        incDueDate:   exportIncDueDate?.checked   ?? true,
+        incPhotoNote: exportIncPhotoNote?.checked  ?? true
+    };
+
+    const selectedEntries = [...exportEntryList.querySelectorAll("li")]
+        .filter(li => li.querySelector("input[type=checkbox]")?.checked)
+        .map(li => li._exportEntry);
+
+    exportModalSchliessen();
+
+    if (!selectedEntries.length) {
+        alert("Keine Einträge ausgewählt.");
+        return;
+    }
+
+    const now = new Date();
+    const exportDateShort = new Intl.DateTimeFormat("de-AT", {
+        day: "2-digit", month: "2-digit", year: "numeric"
+    }).format(now);
+    const exportDateLong = new Intl.DateTimeFormat("de-AT", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }).format(now);
+    const exportTitle = `Erinnerungen - ${exportDateShort}`;
+
+    const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
+    const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
+
+    // Fotos via navigator.share teilen (iOS unterstützt kein a.download in PWAs)
+    if (photoEntries.length > 0) {
+        const photoFiles = photoEntries.map((e, i) =>
+            exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
+        );
+        if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                await navigator.share({ title: "Erinnerungen", text });
-                return;
+                await navigator.share({ files: photoFiles, title: exportTitle });
             } catch (err) {
                 if (err?.name === "AbortError") return;
             }
         }
+    }
 
-        if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(text);
-            alert("Liste kopiert.");
-        } else {
-            alert(text);
-        }
+    // Immer: mailto via location.href (funktioniert auch nach await auf iOS)
+    const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
+    window.location.href = mailtoUrl;
+}
+
+if (btnExport)           btnExport.onclick           = exportModalOeffnen;
+if (btnExportModalClose) btnExportModalClose.onclick  = exportModalSchliessen;
+if (btnExportCancel)     btnExportCancel.onclick      = exportModalSchliessen;
+if (exportModal) {
+    exportModal.onclick = event => {
+        if (event.target === exportModal) exportModalSchliessen();
     };
 }
+if (btnExportRun) btnExportRun.onclick = () => void exportAusfuehren();
+if (btnExportSelectAll) {
+    btnExportSelectAll.onclick = () =>
+        exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
+}
+if (btnExportDeselectAll) {
+    btnExportDeselectAll.onclick = () =>
+        exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+}
+document.querySelectorAll("input[name=export-filter]").forEach(radio => {
+    radio.onchange = () => exportModalFuellenEintraege(radio.value);
+});
