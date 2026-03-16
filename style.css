@@ -278,10 +278,19 @@ button:disabled {
 .photo-button {
     background: #ffedd5;
     color: #9a3412;
-    font-size: 13px;
+    font-size: 20px;
     font-weight: 700;
     grid-area: photo;
-    padding: 8px 8px;
+    padding: 6px 10px;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.photo-btn-label {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    color: #9a3412;
 }
 
 .export-button {
@@ -551,6 +560,9 @@ body.modus-erledigt #liste li {
     border-left-color: #dc2626;
     background: #fff1f2;
 }
+#liste li.overdue .list-item-title {
+    color: #dc2626;
+}
 #liste li.overdue .list-item-due-btn {
     color: #fff;
     background: #dc2626;
@@ -578,6 +590,7 @@ body.modus-erledigt #liste li {
     border-radius: 10px;
     border: 1px solid #cbd5e1;
     flex: 0 0 auto;
+    cursor: pointer;
 }
 
 .list-photo-open {
