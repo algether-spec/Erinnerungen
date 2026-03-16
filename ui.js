@@ -1093,8 +1093,7 @@ async function exportAusfuehren() {
         );
         if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                const shareText = `Betreff: ${exportTitle}\n\n${text}`;
-                await navigator.share({ files: photoFiles, text: shareText, title: exportTitle });
+                await navigator.share({ files: photoFiles, text, title: exportTitle });
                 return;
             } catch (err) {
                 if (err?.name === "AbortError") return;

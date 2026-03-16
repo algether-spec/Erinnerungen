@@ -1032,6 +1032,13 @@ body.modus-erledigt #liste li {
     flex-shrink: 0;
 }
 
+.export-hint {
+    font-size: 12px;
+    color: #64748b;
+    margin: 12px 0 4px;
+    line-height: 1.4;
+}
+
 .export-footer {
     display: flex;
     gap: 8px;
