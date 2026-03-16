@@ -778,41 +778,120 @@ if (btnMic) btnMic.onclick = toggleDictation;
 
 /* --- Export ----------------------------------------------------- */
 
+function exportDataUrlToFile(dataUrl, name) {
+    const [header, base64] = dataUrl.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return new File([bytes], name, { type: mime });
+}
+
+function exportBuildText(exportDate, textEntries, photoEntries) {
+    const offeneLines  = textEntries.filter(e => !e.erledigt).map(e => "• " + e.raw);
+    const erledigteLines = textEntries.filter(e => e.erledigt).map(e => "✔ " + e.raw);
+    const fotoLines = photoEntries.map((e, i) =>
+        `📷 Foto ${i + 1}${e.note ? ": " + e.note : ""}`
+    );
+    return [
+        "Erinnerungen",
+        `Datum: ${exportDate}`,
+        `Eintraege: ${textEntries.length + photoEntries.length}`,
+        "────────────",
+        "",
+        "Offen",
+        ...(offeneLines.length ? offeneLines : ["(keine offenen Eintraege)"]),
+        "",
+        "Erledigt",
+        ...(erledigteLines.length ? erledigteLines : ["(keine erledigten Eintraege)"]),
+        ...(fotoLines.length ? ["", "Fotos", ...fotoLines] : [])
+    ].join("\n");
+}
+
+function exportAsHtmlDownload(exportDate, textEntries, photoEntries) {
+    const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    const offene    = textEntries.filter(e => !e.erledigt);
+    const erledigt  = textEntries.filter(e =>  e.erledigt);
+
+    let html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Erinnerungen ${exportDate}</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:16px;background:#f8f4ef}
+h1{color:#c2410c}h2{color:#374151;font-size:15px;margin-top:16px}
+ul{list-style:none;padding:0}
+li{background:#fff;padding:10px 14px;border-radius:10px;margin-bottom:6px;border-left:5px solid #c2410c}
+li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
+.foto{display:flex;gap:10px;align-items:flex-start}
+.foto img{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.foto-note{font-size:13px;color:#374151}
+.meta{color:#6b7280;font-size:12px;margin-bottom:12px}
+</style></head><body>
+<h1>Erinnerungen</h1>
+<p class="meta">Exportiert: ${exportDate} · Einträge: ${textEntries.length + photoEntries.length}</p>`;
+
+    if (offene.length) {
+        html += `<h2>Offen</h2><ul>${offene.map(e=>`<li>${esc(e.raw)}</li>`).join("")}</ul>`;
+    }
+    if (erledigt.length) {
+        html += `<h2>Erledigt</h2><ul>${erledigt.map(e=>`<li class="done">${esc(e.raw)}</li>`).join("")}</ul>`;
+    }
+    if (photoEntries.length) {
+        html += `<h2>Fotos (${photoEntries.length})</h2><ul>`;
+        photoEntries.forEach((e, i) => {
+            const src = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const note = e.note ? `<span class="foto-note">${esc(e.note)}</span>` : "";
+            html += `<li><div class="foto"><img src="${src}" alt="Foto ${i+1}">${note}</div></li>`;
+        });
+        html += `</ul>`;
+    }
+    html += `</body></html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = `erinnerungen-${exportDate.replace(/\./g, "-")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 if (btnExport) {
     btnExport.onclick = async () => {
-        const textEntries = [...liste.querySelectorAll("li")]
-            .map(li => ({
-                erledigt: li.classList.contains("erledigt"),
-                raw: String(li.dataset.rawText || li.dataset.text || "")
-            }))
-            .filter(item => item.raw && !item.raw.startsWith(IMAGE_ENTRY_PREFIX));
+        const allEntries = [...liste.querySelectorAll("li")].map(li => ({
+            erledigt: li.classList.contains("erledigt"),
+            raw:  String(li.dataset.rawText || li.dataset.text || ""),
+            note: String(li.dataset.note || "").trim()
+        }));
 
-        const offeneLines = textEntries
-            .filter(item => !item.erledigt)
-            .map(item => "• " + item.raw);
-        const erledigteLines = textEntries
-            .filter(item => item.erledigt)
-            .map(item => "✔ " + item.raw);
+        const textEntries  = allEntries.filter(e => e.raw && !e.raw.startsWith(IMAGE_ENTRY_PREFIX));
+        const photoEntries = allEntries.filter(e => e.raw &&  e.raw.startsWith(IMAGE_ENTRY_PREFIX));
 
         const exportDate = new Intl.DateTimeFormat("de-AT", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric"
+            day: "2-digit", month: "2-digit", year: "numeric"
         }).format(new Date());
 
-        const text = [
-            "Erinnerungen",
-            `Datum: ${exportDate}`,
-            `Eintraege: ${textEntries.length}`,
-            "────────────",
-            "",
-            "Offen",
-            ...(offeneLines.length ? offeneLines : ["(keine offenen Eintraege)"]),
-            "",
-            "Erledigt",
-            ...(erledigteLines.length ? erledigteLines : ["(keine erledigten Eintraege)"])
-        ].join("\n");
+        const text = exportBuildText(exportDate, textEntries, photoEntries);
 
+        // Fotos vorhanden → zuerst File-Share versuchen
+        if (photoEntries.length > 0) {
+            const photoFiles = photoEntries.map((e, i) =>
+                exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
+            );
+            if (navigator.canShare?.({ files: photoFiles })) {
+                try {
+                    await navigator.share({ files: photoFiles, text, title: "Erinnerungen" });
+                    return;
+                } catch (err) {
+                    if (err?.name === "AbortError") return;
+                }
+            }
+            // Fallback: HTML-Datei mit eingebetteten Fotos
+            exportAsHtmlDownload(exportDate, textEntries, photoEntries);
+            return;
+        }
+
+        // Nur Text
         if (navigator.share) {
             try {
                 await navigator.share({ title: "Erinnerungen", text });
@@ -821,7 +900,6 @@ if (btnExport) {
                 if (err?.name === "AbortError") return;
             }
         }
-
         if (navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(text);
             alert("Liste kopiert.");
