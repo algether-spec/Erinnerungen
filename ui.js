@@ -872,10 +872,11 @@ function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
     const buildLine = e => {
         const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
         const prefix  = e.isPhoto ? "📸" : e.erledigt ? "✔" : "•";
+        const warn    = overdue ? " ⚠️" : "";
         const title   = e.isPhoto ? (e.note || "Foto") : e.title;
-        const parts   = [`${prefix} ${title}`];
+        const parts   = [`${prefix}${warn} ${title}`];
         if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
-        if (opts.incDueDate   && e.dueDate)   parts.push(`Fällig: ${exportFormatIsoDateShort(e.dueDate)}${overdue ? " ⚠️" : ""}`);
+        if (opts.incDueDate   && e.dueDate)   parts.push(`Fällig: ${exportFormatIsoDateShort(e.dueDate)}`);
         return parts.join(" | ");
     };
 
@@ -922,13 +923,18 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
         const borderCol = done ? "#6d28d9" : overdue ? "#dc2626" : "#c2410c";
 
         if (e.isPhoto) {
-            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
-            const note = (opts.incPhotoNote && e.note)
-                ? `<div style="margin-top:6px;font-size:13px;color:#374151;font-style:italic">${esc(e.note)}</div>` : "";
+            const src     = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const hasNote = opts.incPhotoNote && e.note;
+            const imgRadius = hasNote ? "8px 8px 0 0" : "8px";
+            const caption = hasNote
+                ? `<div style="background:#f1f5f9;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;padding:8px 12px;font-size:13px;color:#374151;font-style:italic">📝 ${esc(e.note)}</div>` : "";
             const meta = buildMeta(e);
             return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
-  <img src="${src}" style="width:100%;max-width:480px;border-radius:8px;display:block;margin-bottom:4px">
-  ${note}${meta ? `<div style="margin-top:4px">${meta}</div>` : ""}
+  <div style="border-radius:8px;overflow:hidden;margin-bottom:${meta ? "6px" : "0"}">
+    <img src="${src}" style="width:100%;max-width:480px;border-radius:${imgRadius};display:block">
+    ${caption}
+  </div>
+  ${meta ? `<div>${meta}</div>` : ""}
 </li>`;
         }
 
@@ -1098,7 +1104,9 @@ async function exportAusfuehren() {
     const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
     const mailLink = document.createElement("a");
     mailLink.href = mailtoUrl;
+    document.body.appendChild(mailLink);
     mailLink.click();
+    document.body.removeChild(mailLink);
 }
 
 if (btnExport)           btnExport.onclick           = exportModalOeffnen;
