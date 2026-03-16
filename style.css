@@ -167,6 +167,17 @@ header {
     font-weight: 700;
 }
 
+.sync-code-change {
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .sync-code-share {
     min-height: 28px;
     padding: 4px 10px;

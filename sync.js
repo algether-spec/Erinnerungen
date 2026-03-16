@@ -128,6 +128,10 @@ function geraetRolleUiAktualisieren() {
     if (typeof btnSyncConnect !== "undefined" && btnSyncConnect)
         btnSyncConnect.hidden = (rolle !== "");
 
+    // Wechseln: nur für Hauptgerät mit gültigem Code
+    if (typeof btnSyncCodeChange !== "undefined" && btnSyncCodeChange)
+        btnSyncCodeChange.hidden = (rolle !== "hauptgeraet" || !hatCode);
+
     // Versions-Badge
     if (typeof versionBadge !== "undefined" && versionBadge) {
         const anzahlLabel = (rolle === "hauptgeraet" && _geraeteAnzahl > 0) ? ` · ${_geraeteAnzahl}` : "";
@@ -739,6 +743,13 @@ function syncCodeUiEinrichten(initOptions = {}) {
 
     if (btnSyncConnect) {
         btnSyncConnect.onclick = () => {
+            if (syncCodeInput) syncCodeInput.value = "";
+            syncBearbeitungsmodusSetzen(true);
+        };
+    }
+
+    if (btnSyncCodeChange) {
+        btnSyncCodeChange.onclick = () => {
             if (syncCodeInput) syncCodeInput.value = "";
             syncBearbeitungsmodusSetzen(true);
         };
