@@ -44,6 +44,18 @@ const helpViewer          = document.getElementById("help-viewer");
 const btnHelpViewerClose  = document.getElementById("btn-help-viewer-close");
 const btnHelp             = document.getElementById("btn-help");
 
+const exportModal           = document.getElementById("export-modal");
+const btnExportModalClose   = document.getElementById("btn-export-modal-close");
+const btnExportCancel       = document.getElementById("btn-export-cancel");
+const btnExportRun          = document.getElementById("btn-export-run");
+const btnExportSelectAll    = document.getElementById("btn-export-select-all");
+const btnExportDeselectAll  = document.getElementById("btn-export-deselect-all");
+const exportEntryList       = document.getElementById("export-entry-list");
+const exportIncPhotos       = document.getElementById("export-inc-photos");
+const exportIncEntryDate    = document.getElementById("export-inc-entry-date");
+const exportIncDueDate      = document.getElementById("export-inc-due-date");
+const exportIncPhotoNote    = document.getElementById("export-inc-photo-note");
+
 const SpeechRecognitionCtor =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -785,31 +797,49 @@ function exportDataUrlToFile(dataUrl, name) {
     return new File([bytes], name, { type: mime });
 }
 
-function exportBuildText(exportDate, textEntries, photoEntries) {
-    const offeneLines  = textEntries.filter(e => !e.erledigt).map(e => "• " + e.raw);
-    const erledigteLines = textEntries.filter(e => e.erledigt).map(e => "✔ " + e.raw);
-    const fotoLines = photoEntries.map((e, i) =>
-        `📷 Foto ${i + 1}${e.note ? ": " + e.note : ""}`
-    );
+function exportBuildText(exportDate, entries, opts) {
+    const offene    = entries.filter(e => !e.erledigt && !e.isPhoto);
+    const erledigt  = entries.filter(e =>  e.erledigt && !e.isPhoto);
+    const fotos     = entries.filter(e => e.isPhoto);
+
+    const buildLine = (prefix, e) => {
+        let line = prefix + e.title;
+        if (opts.incEntryDate && e.entryDate) line += ` (${e.entryDate})`;
+        if (opts.incDueDate   && e.dueDate)   line += ` [Fällig: ${e.dueDate}]`;
+        return line;
+    };
+
     return [
         "Erinnerungen",
         `Datum: ${exportDate}`,
-        `Eintraege: ${textEntries.length + photoEntries.length}`,
+        `Eintraege: ${entries.length}`,
         "────────────",
         "",
         "Offen",
-        ...(offeneLines.length ? offeneLines : ["(keine offenen Eintraege)"]),
+        ...(offene.length   ? offene.map(e => buildLine("• ", e))   : ["(keine offenen Eintraege)"]),
         "",
         "Erledigt",
-        ...(erledigteLines.length ? erledigteLines : ["(keine erledigten Eintraege)"]),
-        ...(fotoLines.length ? ["", "Fotos", ...fotoLines] : [])
+        ...(erledigt.length ? erledigt.map(e => buildLine("✔ ", e)) : ["(keine erledigten Eintraege)"]),
+        ...(opts.incPhotos && fotos.length
+            ? ["", "Fotos", ...fotos.map((e, i) =>
+                `📷 Foto ${i + 1}${opts.incPhotoNote && e.note ? ": " + e.note : ""}`)
+              ]
+            : [])
     ].join("\n");
 }
 
-function exportAsHtmlDownload(exportDate, textEntries, photoEntries) {
-    const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
-    const offene    = textEntries.filter(e => !e.erledigt);
-    const erledigt  = textEntries.filter(e =>  e.erledigt);
+function exportAsHtmlDownload(exportDate, entries, opts) {
+    const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const offene   = entries.filter(e => !e.erledigt && !e.isPhoto);
+    const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
+    const fotos    = opts.incPhotos ? entries.filter(e => e.isPhoto) : [];
+
+    const buildDates = e => {
+        let d = "";
+        if (opts.incEntryDate && e.entryDate) d += `<div class="date-meta">Erfasst: ${esc(e.entryDate)}</div>`;
+        if (opts.incDueDate   && e.dueDate)   d += `<div class="date-meta">Fällig: ${esc(e.dueDate)}</div>`;
+        return d;
+    };
 
     let html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -824,22 +854,23 @@ li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
 .foto img{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0}
 .foto-note{font-size:13px;color:#374151}
 .meta{color:#6b7280;font-size:12px;margin-bottom:12px}
+.date-meta{font-size:12px;color:#94a3b8;margin-top:2px}
 </style></head><body>
 <h1>Erinnerungen</h1>
-<p class="meta">Exportiert: ${exportDate} · Einträge: ${textEntries.length + photoEntries.length}</p>`;
+<p class="meta">Exportiert: ${exportDate} · Einträge: ${entries.length}</p>`;
 
     if (offene.length) {
-        html += `<h2>Offen</h2><ul>${offene.map(e=>`<li>${esc(e.raw)}</li>`).join("")}</ul>`;
+        html += `<h2>Offen</h2><ul>${offene.map(e => `<li>${esc(e.title)}${buildDates(e)}</li>`).join("")}</ul>`;
     }
     if (erledigt.length) {
-        html += `<h2>Erledigt</h2><ul>${erledigt.map(e=>`<li class="done">${esc(e.raw)}</li>`).join("")}</ul>`;
+        html += `<h2>Erledigt</h2><ul>${erledigt.map(e => `<li class="done">${esc(e.title)}${buildDates(e)}</li>`).join("")}</ul>`;
     }
-    if (photoEntries.length) {
-        html += `<h2>Fotos (${photoEntries.length})</h2><ul>`;
-        photoEntries.forEach((e, i) => {
-            const src = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
-            const note = e.note ? `<span class="foto-note">${esc(e.note)}</span>` : "";
-            html += `<li><div class="foto"><img src="${src}" alt="Foto ${i+1}">${note}</div></li>`;
+    if (fotos.length) {
+        html += `<h2>Fotos (${fotos.length})</h2><ul>`;
+        fotos.forEach((e, i) => {
+            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const note = (opts.incPhotoNote && e.note) ? `<span class="foto-note">${esc(e.note)}</span>` : "";
+            html += `<li><div class="foto"><img src="${src}" alt="Foto ${i + 1}">${note}</div></li>`;
         });
         html += `</ul>`;
     }
@@ -856,55 +887,137 @@ li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-if (btnExport) {
-    btnExport.onclick = async () => {
-        const allEntries = [...liste.querySelectorAll("li")].map(li => ({
-            erledigt: li.classList.contains("erledigt"),
-            raw:  String(li.dataset.rawText || li.dataset.text || ""),
-            note: String(li.dataset.note || "").trim()
-        }));
+function exportListItemsFromListe() {
+    return [...liste.querySelectorAll("li")].map(li => {
+        const raw = String(li.dataset.rawText || li.dataset.text || "");
+        return {
+            erledigt:  li.classList.contains("erledigt"),
+            raw,
+            title:     String(li.dataset.title || raw).trim(),
+            note:      String(li.dataset.note || "").trim(),
+            entryDate: String(li.dataset.entryDate || "").slice(0, 10),
+            dueDate:   String(li.dataset.dueDate || "").slice(0, 10),
+            isPhoto:   raw.startsWith(IMAGE_ENTRY_PREFIX)
+        };
+    });
+}
 
-        const textEntries  = allEntries.filter(e => e.raw && !e.raw.startsWith(IMAGE_ENTRY_PREFIX));
-        const photoEntries = allEntries.filter(e => e.raw &&  e.raw.startsWith(IMAGE_ENTRY_PREFIX));
+function exportModalFuellenEintraege(filter) {
+    if (!exportEntryList) return;
+    const alle = exportListItemsFromListe();
+    const gefiltert = filter === "open"
+        ? alle.filter(e => !e.erledigt)
+        : filter === "done"
+            ? alle.filter(e =>  e.erledigt)
+            : alle;
 
-        const exportDate = new Intl.DateTimeFormat("de-AT", {
-            day: "2-digit", month: "2-digit", year: "numeric"
-        }).format(new Date());
+    exportEntryList.innerHTML = "";
+    gefiltert.forEach(e => {
+        const li    = document.createElement("li");
+        li.className = "export-entry-item";
+        const label = document.createElement("label");
+        label.className = "export-entry-label";
+        const cb    = document.createElement("input");
+        cb.type     = "checkbox";
+        cb.checked  = true;
+        const span  = document.createElement("span");
+        span.textContent = e.isPhoto
+            ? "📷" + (e.note ? " " + e.note : " Foto")
+            : (e.erledigt ? "✔ " : "• ") + e.title;
+        label.appendChild(cb);
+        label.appendChild(span);
+        li.appendChild(label);
+        li._exportEntry = e;
+        exportEntryList.appendChild(li);
+    });
+}
 
-        const text = exportBuildText(exportDate, textEntries, photoEntries);
+function exportModalOeffnen() {
+    const activeFilter = document.querySelector("input[name=export-filter]:checked")?.value || "all";
+    exportModalFuellenEintraege(activeFilter);
+    if (exportModal) exportModal.hidden = false;
+}
 
-        // Fotos vorhanden → zuerst File-Share versuchen
-        if (photoEntries.length > 0) {
-            const photoFiles = photoEntries.map((e, i) =>
-                exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
-            );
-            if (navigator.canShare?.({ files: photoFiles })) {
-                try {
-                    await navigator.share({ files: photoFiles, text, title: "Erinnerungen" });
-                    return;
-                } catch (err) {
-                    if (err?.name === "AbortError") return;
-                }
-            }
-            // Fallback: HTML-Datei mit eingebetteten Fotos
-            exportAsHtmlDownload(exportDate, textEntries, photoEntries);
-            return;
-        }
+function exportModalSchliessen() {
+    if (exportModal) exportModal.hidden = true;
+}
 
-        // Nur Text
-        if (navigator.share) {
+async function exportAusfuehren() {
+    if (!exportEntryList) return;
+    const opts = {
+        incPhotos:    exportIncPhotos?.checked    ?? true,
+        incEntryDate: exportIncEntryDate?.checked ?? true,
+        incDueDate:   exportIncDueDate?.checked   ?? true,
+        incPhotoNote: exportIncPhotoNote?.checked  ?? true
+    };
+
+    const selectedEntries = [...exportEntryList.querySelectorAll("li")]
+        .filter(li => li.querySelector("input[type=checkbox]")?.checked)
+        .map(li => li._exportEntry);
+
+    exportModalSchliessen();
+
+    if (!selectedEntries.length) {
+        alert("Keine Einträge ausgewählt.");
+        return;
+    }
+
+    const exportDate = new Intl.DateTimeFormat("de-AT", {
+        day: "2-digit", month: "2-digit", year: "numeric"
+    }).format(new Date());
+
+    const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
+    const text = exportBuildText(exportDate, selectedEntries, opts);
+
+    if (photoEntries.length > 0) {
+        const photoFiles = photoEntries.map((e, i) =>
+            exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
+        );
+        if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                await navigator.share({ title: "Erinnerungen", text });
+                await navigator.share({ files: photoFiles, text, title: "Erinnerungen" });
                 return;
             } catch (err) {
                 if (err?.name === "AbortError") return;
             }
         }
-        if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(text);
-            alert("Liste kopiert.");
-        } else {
-            alert(text);
+        exportAsHtmlDownload(exportDate, selectedEntries, opts);
+        return;
+    }
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: "Erinnerungen", text });
+            return;
+        } catch (err) {
+            if (err?.name === "AbortError") return;
         }
+    }
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        alert("Liste kopiert.");
+    } else {
+        alert(text);
+    }
+}
+
+if (btnExport)           btnExport.onclick           = exportModalOeffnen;
+if (btnExportModalClose) btnExportModalClose.onclick  = exportModalSchliessen;
+if (btnExportCancel)     btnExportCancel.onclick      = exportModalSchliessen;
+if (exportModal) {
+    exportModal.onclick = event => {
+        if (event.target === exportModal) exportModalSchliessen();
     };
 }
+if (btnExportRun) btnExportRun.onclick = () => void exportAusfuehren();
+if (btnExportSelectAll) {
+    btnExportSelectAll.onclick = () =>
+        exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
+}
+if (btnExportDeselectAll) {
+    btnExportDeselectAll.onclick = () =>
+        exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+}
+document.querySelectorAll("input[name=export-filter]").forEach(radio => {
+    radio.onchange = () => exportModalFuellenEintraege(radio.value);
+});

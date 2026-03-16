@@ -20,10 +20,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="style.css?v=1.0.21">
+    <link rel="stylesheet" href="style.css?v=1.0.22">
 
     <!-- Manifest -->
-    <link rel="manifest" href="manifest.json?v=1.0.21">
+    <link rel="manifest" href="manifest.json?v=1.0.22">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
 </head>
@@ -176,8 +176,44 @@
         </div>
     </div>
 
+    <div id="export-modal" class="export-modal" hidden>
+        <div class="export-card">
+            <button type="button" id="btn-export-modal-close" class="export-modal-close">Schließen</button>
+            <h2>Exportieren</h2>
+
+            <div class="export-section">
+                <div class="export-section-title">Was exportieren?</div>
+                <label class="export-radio-label"><input type="radio" name="export-filter" value="all" checked> Alle Einträge</label>
+                <label class="export-radio-label"><input type="radio" name="export-filter" value="open"> Nur offene Einträge</label>
+                <label class="export-radio-label"><input type="radio" name="export-filter" value="done"> Nur erledigte Einträge</label>
+            </div>
+
+            <div class="export-section">
+                <div class="export-section-title">Einzelne Einträge auswählen</div>
+                <div class="export-select-actions">
+                    <button type="button" id="btn-export-select-all" class="export-select-btn">Alle ✓</button>
+                    <button type="button" id="btn-export-deselect-all" class="export-select-btn">Alle ✗</button>
+                </div>
+                <ul id="export-entry-list" class="export-entry-list"></ul>
+            </div>
+
+            <div class="export-section">
+                <div class="export-section-title">Was beinhalten?</div>
+                <label class="export-check-label"><input type="checkbox" id="export-inc-photos" checked> Fotos</label>
+                <label class="export-check-label"><input type="checkbox" id="export-inc-entry-date" checked> Erfassungsdatum</label>
+                <label class="export-check-label"><input type="checkbox" id="export-inc-due-date" checked> Fälligkeitsdatum</label>
+                <label class="export-check-label"><input type="checkbox" id="export-inc-photo-note" checked> Text zu Fotos</label>
+            </div>
+
+            <div class="export-footer">
+                <button type="button" id="btn-export-cancel" class="export-cancel-btn">Abbrechen</button>
+                <button type="button" id="btn-export-run" class="export-run-btn">Exportieren</button>
+            </div>
+        </div>
+    </div>
+
     <div class="version-row">
-        <div class="version-badge" id="version-badge">v1.0.21</div>
+        <div class="version-badge" id="version-badge">v1.0.22</div>
     </div>
     <div class="version-subline">von Al.Gether</div>
     <div class="sync-status" id="sync-status">Sync: Lokal</div>
@@ -195,13 +231,13 @@
 
 </div>
 
-<script src="config.js?v=1.0.21"></script>
-<script src="utils.js?v=1.0.21"></script>
+<script src="config.js?v=1.0.22"></script>
+<script src="utils.js?v=1.0.22"></script>
 <script src="supabase-lib.js"></script>
-<script src="supabase.js?v=1.0.21"></script>
-<script src="sync.js?v=1.0.21"></script>
-<script src="ui.js?v=1.0.21"></script>
-<script src="app.js?v=1.0.21"></script>
+<script src="supabase.js?v=1.0.22"></script>
+<script src="sync.js?v=1.0.22"></script>
+<script src="ui.js?v=1.0.22"></script>
+<script src="app.js?v=1.0.22"></script>
 
 </body>
 </html>
