@@ -890,6 +890,7 @@ function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
         );
     }
 
+    lines.push("", "────────────", "Gesendet von Erinnerungen App – Al.Gether");
     return lines.join("\n");
 }
 
@@ -900,54 +901,95 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
     const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
     const fotos    = opts.incPhotos ? entries.filter(e => e.isPhoto) : [];
 
-    const buildDates = e => {
-        let d = "";
-        if (opts.incEntryDate && e.entryDate) d += `<div class="date-meta">Erfasst: ${esc(exportFormatIsoDate(e.entryDate))}</div>`;
-        if (opts.incDueDate   && e.dueDate)   d += `<div class="date-meta">Fällig: ${esc(exportFormatIsoDate(e.dueDate))}</div>`;
-        return d;
+    const dueBadge = e => {
+        if (!opts.incDueDate || !e.dueDate) return "";
+        const isOverdue  = e.dueDate < today && !e.erledigt;
+        const isToday    = e.dueDate === today && !e.erledigt;
+        const bg  = isOverdue ? "#dc2626" : isToday ? "#ea580c" : "#64748b";
+        const lbl = isOverdue ? `⚠️ Fällig: ${exportFormatIsoDate(e.dueDate)}` : `📅 Fällig: ${exportFormatIsoDate(e.dueDate)}`;
+        return `<span style="display:inline-block;margin-top:5px;padding:2px 9px;border-radius:999px;background:${bg};color:#fff;font-size:12px;font-weight:600">${esc(lbl)}</span>`;
     };
 
-    const buildItem = (e, cls = "") => {
-        const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
-        const warn = overdue ? `<span class="overdue-warn">⚠️</span> ` : "";
-        return `<li${cls ? ` class="${cls}"` : ""}${overdue ? ' style="border-left-color:#dc2626"' : ""}>${warn}${esc(e.title)}${buildDates(e)}</li>`;
+    const entryDateBadge = e => {
+        if (!opts.incEntryDate || !e.entryDate) return "";
+        return `<span style="display:inline-block;margin-top:4px;font-size:11px;color:#94a3b8">Erfasst: ${esc(exportFormatIsoDate(e.entryDate))}</span>`;
     };
 
-    let html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+    const buildItem = (e, done = false) => {
+        const overdue    = e.dueDate && e.dueDate < today && !e.erledigt;
+        const borderCol  = done ? "#6d28d9" : overdue ? "#dc2626" : "#c2410c";
+        const titleStyle = done ? "text-decoration:line-through;color:#9ca3af" : overdue ? "color:#dc2626;font-weight:700" : "color:#1e293b;font-weight:600";
+        const warn       = overdue ? "⚠️ " : done ? "✔ " : "• ";
+        return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <div style="${titleStyle}">${warn}${esc(e.title)}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${dueBadge(e)}${entryDateBadge(e)}</div>
+</li>`;
+    };
+
+    const sectionHtml = (title, icon, items, done = false) => {
+        if (!items.length) return "";
+        return `
+<div style="margin-top:24px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #e5e7eb">
+    <span style="font-size:18px">${icon}</span>
+    <h2 style="margin:0;font-size:16px;font-weight:700;color:#374151">${title} <span style="color:#94a3b8;font-weight:400;font-size:14px">(${items.length})</span></h2>
+  </div>
+  <ul style="list-style:none;padding:0;margin:0">${items.map(e => buildItem(e, done)).join("")}</ul>
+</div>`;
+    };
+
+    let fotosHtml = "";
+    if (fotos.length) {
+        const items = fotos.map((e, i) => {
+            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const note = (opts.incPhotoNote && e.note)
+                ? `<div style="margin-top:8px;font-size:13px;color:#374151;font-style:italic">${esc(e.note)}</div>` : "";
+            return `<li style="background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+  <img src="${src}" alt="Foto ${i + 1}" style="width:100%;max-width:480px;border-radius:10px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
+  ${note}
+</li>`;
+        }).join("");
+        fotosHtml = `
+<div style="margin-top:24px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #e5e7eb">
+    <span style="font-size:18px">📷</span>
+    <h2 style="margin:0;font-size:16px;font-weight:700;color:#374151">Fotos <span style="color:#94a3b8;font-weight:400;font-size:14px">(${fotos.length})</span></h2>
+  </div>
+  <ul style="list-style:none;padding:0;margin:0">${items}</ul>
+</div>`;
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Erinnerungen - ${esc(exportDateShort)}</title>
-<style>
-body{font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:16px;background:#f8f4ef}
-h1{color:#c2410c;margin-bottom:4px}h2{color:#374151;font-size:15px;margin-top:16px}
-ul{list-style:none;padding:0}
-li{background:#fff;padding:10px 14px;border-radius:10px;margin-bottom:6px;border-left:5px solid #c2410c}
-li.done{border-left-color:#6d28d9;opacity:.6;text-decoration:line-through}
-.foto{display:flex;gap:10px;align-items:flex-start}
-.foto img{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0}
-.foto-note{font-size:13px;color:#374151}
-.meta{color:#6b7280;font-size:13px;margin-bottom:12px}
-.date-meta{font-size:12px;color:#94a3b8;margin-top:2px}
-.overdue-warn{font-style:normal}
-</style></head><body>
-<h1>Erinnerungen</h1>
-<p class="meta">${esc(exportDateLong)} · ${entries.length} Einträge</p>`;
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:16px">
 
-    if (offene.length) {
-        html += `<h2>Offen</h2><ul>${offene.map(e => buildItem(e)).join("")}</ul>`;
-    }
-    if (erledigt.length) {
-        html += `<h2>Erledigt</h2><ul>${erledigt.map(e => buildItem(e, "done")).join("")}</ul>`;
-    }
-    if (fotos.length) {
-        html += `<h2>Fotos (${fotos.length})</h2><ul>`;
-        fotos.forEach((e, i) => {
-            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
-            const note = (opts.incPhotoNote && e.note) ? `<span class="foto-note">${esc(e.note)}</span>` : "";
-            html += `<li><div class="foto"><img src="${src}" alt="Foto ${i + 1}">${note}</div></li>`;
-        });
-        html += `</ul>`;
-    }
-    html += `</body></html>`;
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#7c2d12,#c2410c,#ea580c);border-radius:16px;padding:24px 20px;margin-bottom:20px;color:#fff">
+    <div style="font-size:32px;margin-bottom:6px">🧠</div>
+    <h1 style="margin:0 0 4px;font-size:26px;font-weight:800;letter-spacing:0.3px">Erinnerungen</h1>
+    <p style="margin:0;font-size:14px;opacity:0.9">${esc(exportDateLong)}</p>
+    <p style="margin:8px 0 0;font-size:13px;opacity:0.75">${entries.length} Einträge</p>
+  </div>
+
+  <!-- Sections -->
+  ${sectionHtml("Offen", "📋", offene, false)}
+  ${sectionHtml("Erledigt", "✅", erledigt, true)}
+  ${fotosHtml}
+
+  <!-- Signatur -->
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:12px">
+    Gesendet von <strong style="color:#64748b">Erinnerungen App</strong> – Al.Gether
+  </div>
+
+</div>
+</body>
+</html>`;
 
     const blob = new Blob([html], { type: "text/html" });
     const url  = URL.createObjectURL(blob);
