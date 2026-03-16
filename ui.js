@@ -295,6 +295,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
             noteWrap.appendChild(ta);
             noteWrap.appendChild(confirmBtn);
             ta.focus();
+            setTimeout(() => ta.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
         });
 
         wrapper.appendChild(noteWrap);
@@ -496,6 +497,11 @@ function fokusInputAmEnde() {
 }
 
 if (multiInput) multiInput.addEventListener("input", autoResize);
+if (multiInput) {
+    multiInput.addEventListener("focus", () => {
+        setTimeout(() => multiInput.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
+    });
+}
 if (multiInput) {
     multiInput.addEventListener("keydown", event => {
         if (event.key !== "Enter" || event.isComposing) return;
