@@ -136,8 +136,9 @@ header {
 .sync-code-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow: hidden;
 }
 
 .sync-code-label {
