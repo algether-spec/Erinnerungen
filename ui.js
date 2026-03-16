@@ -871,7 +871,7 @@ function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
 
     const buildLine = e => {
         const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
-        const prefix  = e.isPhoto ? "📷" : e.erledigt ? "✔" : "•";
+        const prefix  = e.isPhoto ? "📸" : e.erledigt ? "✔" : "•";
         const title   = e.isPhoto ? (e.note || "Foto") : e.title;
         const parts   = [`${prefix} ${title}`];
         if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
@@ -1026,7 +1026,7 @@ function exportModalFuellenEintraege(filter) {
         cb.checked  = true;
         const span  = document.createElement("span");
         span.textContent = e.isPhoto
-            ? "📷" + (e.note ? " " + e.note : " Foto")
+            ? "📸" + (e.note ? " " + e.note : " Foto")
             : (e.erledigt ? "✔ " : "• ") + e.title;
         label.appendChild(cb);
         label.appendChild(span);
