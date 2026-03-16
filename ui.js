@@ -1084,23 +1084,23 @@ async function exportAusfuehren() {
     const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
     const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
 
+    // Fotos separat teilen (wenn vorhanden)
     if (photoEntries.length > 0) {
         const photoFiles = photoEntries.map((e, i) =>
             exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
         );
         if (navigator.canShare?.({ files: photoFiles })) {
             try {
-                await navigator.share({ files: photoFiles, text, title: exportTitle });
-                return;
+                await navigator.share({ files: photoFiles, title: exportTitle });
             } catch (err) {
                 if (err?.name === "AbortError") return;
             }
+        } else {
+            exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
         }
-        exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
-        return;
     }
 
-    // Text-Export: mailto mit vorausgefülltem Empfänger und Betreff
+    // Immer: Text-Export via mailto mit vorausgefülltem Empfänger und Betreff
     const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
     const mailLink = document.createElement("a");
     mailLink.href = mailtoUrl;
