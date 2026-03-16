@@ -9,7 +9,7 @@ const APP_CONFIG = window.APP_CONFIG || {};
    KONSTANTEN
 ====================== */
 
-const APP_VERSION = "1.0.28";
+const APP_VERSION = "1.0.29";
 const STORAGE_KEY = "erinnerungen";
 const SUPABASE_TABLE = "reminder_items";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
@@ -21,6 +21,7 @@ const SYNC_CODE_INSTALL_URL_KEY = "erinnerungen-install-url-code";
 const DEVICE_ID_KEY = "erinnerungen-device-id";
 
 const IMAGE_ENTRY_PREFIX = "__IMG__:";
+const EXPORT_EMAIL = "al.gether@gmail.com";
 
 const SYNC_CODE_LENGTH = 8;
 const RESERVED_SYNC_CODE = "HELP0000";

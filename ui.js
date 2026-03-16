@@ -855,18 +855,28 @@ function exportFormatIsoDate(isoDate) {
     } catch { return isoDate; }
 }
 
+function exportFormatIsoDateShort(isoDate) {
+    if (!isoDate) return "";
+    try {
+        return new Intl.DateTimeFormat("de-AT", {
+            day: "2-digit", month: "2-digit"
+        }).format(new Date(isoDate + "T12:00:00"));
+    } catch { return isoDate; }
+}
+
 function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
     const today  = getTodayDateString();
-    const offene   = entries.filter(e => !e.erledigt && !e.isPhoto);
-    const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
-    const fotos    = entries.filter(e => e.isPhoto);
+    const offene   = entries.filter(e => !e.erledigt && (!e.isPhoto || opts.incPhotos));
+    const erledigt = entries.filter(e =>  e.erledigt && (!e.isPhoto || opts.incPhotos));
 
-    const buildLine = (prefix, e) => {
+    const buildLine = e => {
         const overdue = e.dueDate && e.dueDate < today && !e.erledigt;
-        let line = (overdue ? "⚠️ " : prefix) + e.title;
-        if (opts.incEntryDate && e.entryDate) line += ` (Erfasst: ${exportFormatIsoDate(e.entryDate)})`;
-        if (opts.incDueDate   && e.dueDate)   line += ` [Fällig: ${exportFormatIsoDate(e.dueDate)}]`;
-        return line;
+        const prefix  = e.isPhoto ? "📷" : e.erledigt ? "✔" : "•";
+        const title   = e.isPhoto ? (e.note || "Foto") : e.title;
+        const parts   = [`${prefix} ${title}`];
+        if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
+        if (opts.incDueDate   && e.dueDate)   parts.push(`Fällig: ${exportFormatIsoDateShort(e.dueDate)}${overdue ? " ⚠️" : ""}`);
+        return parts.join(" | ");
     };
 
     const lines = [
@@ -878,17 +888,11 @@ function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
 
     if (offene.length) {
         lines.push("", "Offen");
-        offene.forEach(e => lines.push(buildLine("• ", e)));
+        offene.forEach(e => lines.push(buildLine(e)));
     }
     if (erledigt.length) {
         lines.push("", "Erledigt");
-        erledigt.forEach(e => lines.push(buildLine("✔ ", e)));
-    }
-    if (opts.incPhotos && fotos.length) {
-        lines.push("", "Fotos");
-        fotos.forEach((e, i) =>
-            lines.push(`📷 Foto ${i + 1}${opts.incPhotoNote && e.note ? ": " + e.note : ""}`)
-        );
+        erledigt.forEach(e => lines.push(buildLine(e)));
     }
 
     lines.push("", "────────────", "Gesendet von Erinnerungen App – Al.Gether");
@@ -898,32 +902,41 @@ function exportBuildText(exportDateShort, exportDateLong, entries, opts) {
 function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
     const esc   = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
     const today = getTodayDateString();
-    const offene   = entries.filter(e => !e.erledigt && !e.isPhoto);
-    const erledigt = entries.filter(e =>  e.erledigt && !e.isPhoto);
-    const fotos    = opts.incPhotos ? entries.filter(e => e.isPhoto) : [];
+    const offene   = entries.filter(e => !e.erledigt && (!e.isPhoto || opts.incPhotos));
+    const erledigt = entries.filter(e =>  e.erledigt && (!e.isPhoto || opts.incPhotos));
 
-    const dueBadge = e => {
-        if (!opts.incDueDate || !e.dueDate) return "";
-        const isOverdue  = e.dueDate < today && !e.erledigt;
-        const isToday    = e.dueDate === today && !e.erledigt;
-        const bg  = isOverdue ? "#dc2626" : isToday ? "#ea580c" : "#64748b";
-        const lbl = isOverdue ? `⚠️ Fällig: ${exportFormatIsoDate(e.dueDate)}` : `📅 Fällig: ${exportFormatIsoDate(e.dueDate)}`;
-        return `<span style="display:inline-block;margin-top:5px;padding:2px 9px;border-radius:999px;background:${bg};color:#fff;font-size:12px;font-weight:600">${esc(lbl)}</span>`;
-    };
-
-    const entryDateBadge = e => {
-        if (!opts.incEntryDate || !e.entryDate) return "";
-        return `<span style="display:inline-block;margin-top:4px;font-size:11px;color:#94a3b8">Erfasst: ${esc(exportFormatIsoDate(e.entryDate))}</span>`;
+    const buildMeta = e => {
+        const parts = [];
+        if (opts.incEntryDate && e.entryDate) parts.push(`Erfasst: ${exportFormatIsoDateShort(e.entryDate)}`);
+        if (opts.incDueDate   && e.dueDate) {
+            const overdue = e.dueDate < today && !e.erledigt;
+            const isToday = e.dueDate === today && !e.erledigt;
+            const col = overdue ? "#dc2626" : isToday ? "#ea580c" : "#64748b";
+            parts.push(`<span style="color:${col};font-weight:600">Fällig: ${esc(exportFormatIsoDateShort(e.dueDate))}${overdue ? " ⚠️" : ""}</span>`);
+        }
+        return parts.length ? `<span style="color:#94a3b8;font-size:12px;margin-left:6px">${parts.join(" | ")}</span>` : "";
     };
 
     const buildItem = (e, done = false) => {
-        const overdue    = e.dueDate && e.dueDate < today && !e.erledigt;
-        const borderCol  = done ? "#6d28d9" : overdue ? "#dc2626" : "#c2410c";
-        const titleStyle = done ? "text-decoration:line-through;color:#9ca3af" : overdue ? "color:#dc2626;font-weight:700" : "color:#1e293b;font-weight:600";
-        const warn       = overdue ? "⚠️ " : done ? "✔ " : "• ";
+        const overdue   = e.dueDate && e.dueDate < today && !e.erledigt;
+        const borderCol = done ? "#6d28d9" : overdue ? "#dc2626" : "#c2410c";
+
+        if (e.isPhoto) {
+            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
+            const note = (opts.incPhotoNote && e.note)
+                ? `<div style="margin-top:6px;font-size:13px;color:#374151;font-style:italic">${esc(e.note)}</div>` : "";
+            const meta = buildMeta(e);
+            return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+  <img src="${src}" style="width:100%;max-width:480px;border-radius:8px;display:block;margin-bottom:4px">
+  ${note}${meta ? `<div style="margin-top:4px">${meta}</div>` : ""}
+</li>`;
+        }
+
+        const titleCol = done ? "#9ca3af" : overdue ? "#dc2626" : "#1e293b";
+        const titleDec = done ? "text-decoration:line-through;" : "";
+        const prefix   = done ? "✔ " : "• ";
         return `<li style="background:#fff;border-left:5px solid ${borderCol};border-radius:10px;padding:10px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
-  <div style="${titleStyle}">${warn}${esc(e.title)}</div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${dueBadge(e)}${entryDateBadge(e)}</div>
+  <span style="${titleDec}font-weight:600;color:${titleCol}">${prefix}${esc(e.title)}</span>${buildMeta(e)}
 </li>`;
     };
 
@@ -939,27 +952,6 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
 </div>`;
     };
 
-    let fotosHtml = "";
-    if (fotos.length) {
-        const items = fotos.map((e, i) => {
-            const src  = e.raw.slice(IMAGE_ENTRY_PREFIX.length);
-            const note = (opts.incPhotoNote && e.note)
-                ? `<div style="margin-top:8px;font-size:13px;color:#374151;font-style:italic">${esc(e.note)}</div>` : "";
-            return `<li style="background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
-  <img src="${src}" alt="Foto ${i + 1}" style="width:100%;max-width:480px;border-radius:10px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
-  ${note}
-</li>`;
-        }).join("");
-        fotosHtml = `
-<div style="margin-top:24px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #e5e7eb">
-    <span style="font-size:18px">📷</span>
-    <h2 style="margin:0;font-size:16px;font-weight:700;color:#374151">Fotos <span style="color:#94a3b8;font-weight:400;font-size:14px">(${fotos.length})</span></h2>
-  </div>
-  <ul style="list-style:none;padding:0;margin:0">${items}</ul>
-</div>`;
-    }
-
     const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -970,7 +962,6 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif">
 <div style="max-width:600px;margin:0 auto;padding:16px">
 
-  <!-- Header -->
   <div style="background:linear-gradient(135deg,#7c2d12,#c2410c,#ea580c);border-radius:16px;padding:24px 20px;margin-bottom:20px;color:#fff">
     <div style="font-size:32px;margin-bottom:6px">🧠</div>
     <h1 style="margin:0 0 4px;font-size:26px;font-weight:800;letter-spacing:0.3px">Erinnerungen</h1>
@@ -978,12 +969,9 @@ function exportAsHtmlDownload(exportDateShort, exportDateLong, entries, opts) {
     <p style="margin:8px 0 0;font-size:13px;opacity:0.75">${entries.length} Einträge</p>
   </div>
 
-  <!-- Sections -->
   ${sectionHtml("Offen", "📋", offene, false)}
   ${sectionHtml("Erledigt", "✅", erledigt, true)}
-  ${fotosHtml}
 
-  <!-- Signatur -->
   <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:12px">
     Gesendet von <strong style="color:#64748b">Erinnerungen App</strong> – Al.Gether
   </div>
@@ -1106,20 +1094,11 @@ async function exportAusfuehren() {
         return;
     }
 
-    if (navigator.share) {
-        try {
-            await navigator.share({ title: exportTitle, text });
-            return;
-        } catch (err) {
-            if (err?.name === "AbortError") return;
-        }
-    }
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        alert("Liste kopiert.");
-    } else {
-        alert(text);
-    }
+    // Text-Export: mailto mit vorausgefülltem Empfänger und Betreff
+    const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
+    const mailLink = document.createElement("a");
+    mailLink.href = mailtoUrl;
+    mailLink.click();
 }
 
 if (btnExport)           btnExport.onclick           = exportModalOeffnen;
