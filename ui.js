@@ -25,7 +25,6 @@ const authStatus     = document.getElementById("auth-status");
 
 const multiInput       = document.getElementById("multi-line-input");
 const multiAdd         = document.getElementById("add-all-button");
-const dueDateInput     = document.getElementById("due-date-input");
 const btnPhotoOcr      = document.getElementById("btn-photo-ocr");
 const photoOcrInput    = document.getElementById("photo-ocr-input");
 const btnClearInput    = document.getElementById("btn-clear-input");
@@ -457,16 +456,14 @@ function mehrzeilenSpeichern() {
     const text = multiInput.value.trim();
     if (!text) return;
 
-    const dueDate = dueDateInput ? String(dueDateInput.value || "").trim() : "";
     text.split("\n")
         .map(l => l.trim())
         .filter(Boolean)
-        .forEach(item => eintragAnlegen({ text: item, dueDate }));
+        .forEach(item => eintragAnlegen({ text: item }));
 
     speichern();
     multiInput.value = "";
     autoResize();
-    if (dueDateInput) { dueDateInput.value = ""; dueDateButtonAktualisieren(); }
     multiInput.blur();
 
     if (isListening) {
@@ -503,22 +500,6 @@ function clearInputBuffer(stopDictation = false) {
 }
 
 if (multiAdd) multiAdd.onclick = mehrzeilenSpeichern;
-
-/* --- Fälligkeitsdatum-Button ------------------------------------ */
-
-function dueDateButtonAktualisieren() {
-    const btn = document.getElementById("btn-due-date");
-    if (!btn || !dueDateInput) return;
-    const hasDate = Boolean(dueDateInput.value);
-    btn.classList.toggle("has-date", hasDate);
-    btn.title = hasDate
-        ? `Fällig: ${formatDueDate(dueDateInput.value)} (tippen zum Ändern)`
-        : "Fälligkeitsdatum setzen";
-}
-
-if (dueDateInput) {
-    dueDateInput.addEventListener("change", dueDateButtonAktualisieren);
-}
 
 if (btnClearInput) {
     btnClearInput.onclick = () => clearInputBuffer(false);

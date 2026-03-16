@@ -248,8 +248,8 @@ button:disabled {
 
 .input-actions {
     display: grid;
-    grid-template-columns: auto auto 1fr auto auto auto;
-    grid-template-areas: "mic clear add due photo export";
+    grid-template-columns: auto auto 1fr auto auto;
+    grid-template-areas: "mic clear add photo export";
     gap: 6px;
     align-items: stretch;
 }
@@ -286,10 +286,9 @@ button:disabled {
 .export-button {
     background: linear-gradient(135deg, #0f172a, #334155);
     color: #f8fafc;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
+    font-size: 18px;
     grid-area: export;
+    min-width: 40px;
 }
 
 .mic-button {
@@ -297,6 +296,7 @@ button:disabled {
     color: #9f1239;
     font-size: 17px;
     grid-area: mic;
+    min-width: 40px;
 }
 
 .mic-button.listening {
@@ -567,42 +567,6 @@ body.modus-erledigt #liste li {
     font-weight: 600;
 }
 
-/* Datum-Picker Button */
-.due-date-wrap {
-    grid-area: due;
-    position: relative;
-    display: flex;
-}
-
-.due-date-button {
-    width: 100%;
-    min-height: 40px;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    background: #f8fafc;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.due-date-button.has-date {
-    background: #fff7ed;
-    border-color: #ea580c;
-}
-
-.due-date-input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-    border: none;
-    background: transparent;
-}
 
 .list-photo-thumb {
     width: 64px;
@@ -1053,15 +1017,6 @@ nav button:not(.active) {
         background: #3b1f14;
     }
 
-    .due-date-button {
-        background: #3c2a23;
-        border-color: #4b5563;
-    }
-
-    .due-date-button.has-date {
-        background: #431407;
-        border-color: #ea580c;
-    }
 }
 
 @media (max-width: 480px) {
