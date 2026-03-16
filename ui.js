@@ -1052,7 +1052,7 @@ function exportModalSchliessen() {
     if (exportModal) exportModal.hidden = true;
 }
 
-async function exportAusfuehren() {
+function exportAusfuehren() {
     if (!exportEntryList) return;
     const opts = {
         incPhotos:    exportIncPhotos?.checked    ?? true,
@@ -1084,23 +1084,12 @@ async function exportAusfuehren() {
     const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
     const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
 
-    // Fotos separat teilen (wenn vorhanden)
+    // Fotos als HTML speichern (synchron, damit User-Gesture erhalten bleibt)
     if (photoEntries.length > 0) {
-        const photoFiles = photoEntries.map((e, i) =>
-            exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
-        );
-        if (navigator.canShare?.({ files: photoFiles })) {
-            try {
-                await navigator.share({ files: photoFiles, title: exportTitle });
-            } catch (err) {
-                if (err?.name === "AbortError") return;
-            }
-        } else {
-            exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
-        }
+        exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
     }
 
-    // Immer: Text-Export via mailto mit vorausgefülltem Empfänger und Betreff
+    // Immer: mailto mit vorausgefülltem Empfänger und Betreff (synchron)
     const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
     const mailLink = document.createElement("a");
     mailLink.href = mailtoUrl;
@@ -1117,7 +1106,7 @@ if (exportModal) {
         if (event.target === exportModal) exportModalSchliessen();
     };
 }
-if (btnExportRun) btnExportRun.onclick = () => void exportAusfuehren();
+if (btnExportRun) btnExportRun.onclick = () => exportAusfuehren();
 if (btnExportSelectAll) {
     btnExportSelectAll.onclick = () =>
         exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
