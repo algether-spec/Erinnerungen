@@ -1052,7 +1052,7 @@ function exportModalSchliessen() {
     if (exportModal) exportModal.hidden = true;
 }
 
-function exportAusfuehren() {
+async function exportAusfuehren() {
     if (!exportEntryList) return;
     const opts = {
         incPhotos:    exportIncPhotos?.checked    ?? true,
@@ -1084,18 +1084,23 @@ function exportAusfuehren() {
     const photoEntries = opts.incPhotos ? selectedEntries.filter(e => e.isPhoto) : [];
     const text = exportBuildText(exportDateShort, exportDateLong, selectedEntries, opts);
 
-    // Fotos als HTML speichern (synchron, damit User-Gesture erhalten bleibt)
+    // Fotos via navigator.share teilen (iOS unterstützt kein a.download in PWAs)
     if (photoEntries.length > 0) {
-        exportAsHtmlDownload(exportDateShort, exportDateLong, selectedEntries, opts);
+        const photoFiles = photoEntries.map((e, i) =>
+            exportDataUrlToFile(e.raw.slice(IMAGE_ENTRY_PREFIX.length), `foto-${i + 1}.jpg`)
+        );
+        if (navigator.canShare?.({ files: photoFiles })) {
+            try {
+                await navigator.share({ files: photoFiles, title: exportTitle });
+            } catch (err) {
+                if (err?.name === "AbortError") return;
+            }
+        }
     }
 
-    // Immer: mailto mit vorausgefülltem Empfänger und Betreff (synchron)
+    // Immer: mailto via location.href (funktioniert auch nach await auf iOS)
     const mailtoUrl = `mailto:${EXPORT_EMAIL}?subject=${encodeURIComponent(exportTitle)}&body=${encodeURIComponent(text)}`;
-    const mailLink = document.createElement("a");
-    mailLink.href = mailtoUrl;
-    document.body.appendChild(mailLink);
-    mailLink.click();
-    document.body.removeChild(mailLink);
+    window.location.href = mailtoUrl;
 }
 
 if (btnExport)           btnExport.onclick           = exportModalOeffnen;
@@ -1106,7 +1111,7 @@ if (exportModal) {
         if (event.target === exportModal) exportModalSchliessen();
     };
 }
-if (btnExportRun) btnExportRun.onclick = () => exportAusfuehren();
+if (btnExportRun) btnExportRun.onclick = () => void exportAusfuehren();
 if (btnExportSelectAll) {
     btnExportSelectAll.onclick = () =>
         exportEntryList?.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = true; });
