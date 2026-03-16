@@ -247,12 +247,8 @@ button:disabled {
 }
 
 .input-actions {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-areas:
-        "mic  clear  due   export"
-        "add  add    photo photo";
-    gap: 8px;
+    display: flex;
+    gap: 6px;
     align-items: stretch;
 }
 
@@ -265,7 +261,7 @@ button:disabled {
     background: var(--primary);
     color: white;
     font-size: 15px;
-    grid-area: add;
+    flex: 1 1 auto;
 }
 
 .clear-input-button {
@@ -273,7 +269,7 @@ button:disabled {
     color: #b91c1c;
     font-size: 13px;
     font-weight: 700;
-    grid-area: clear;
+    flex: 0 0 auto;
 }
 
 .photo-button {
@@ -281,7 +277,7 @@ button:disabled {
     color: #9a3412;
     font-size: 13px;
     font-weight: 700;
-    grid-area: photo;
+    flex: 0 0 auto;
 }
 
 .export-button {
@@ -290,14 +286,14 @@ button:disabled {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.01em;
-    grid-area: export;
+    flex: 0 0 auto;
 }
 
 .mic-button {
     background: #ffe4e6;
     color: #9f1239;
     font-size: 17px;
-    grid-area: mic;
+    flex: 0 0 auto;
 }
 
 .mic-button.listening {
@@ -312,9 +308,8 @@ button:disabled {
 .clear-input-button,
 .add-button,
 .export-button {
-    width: 100%;
     min-height: 40px;
-    padding: 8px;
+    padding: 8px 10px;
     border: none;
     border-radius: 12px;
     display: flex;
@@ -325,10 +320,6 @@ button:disabled {
 
 .action-button {
     display: none;
-}
-
-.add-button {
-    grid-column: span 2;
 }
 
 .mic-status {
@@ -357,19 +348,15 @@ button:disabled {
     min-height: 28px;
     padding: 4px 10px;
     border-radius: 10px;
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
-    color: #0f172a;
+    border: 1px solid #15803d;
+    background: #16a34a;
+    color: #fff;
     font-size: 12px;
     font-weight: 700;
     margin-left: auto;
-    transition: background 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .update-button.update-available {
-    background: #16a34a;
-    border-color: #15803d;
-    color: #fff;
     animation: update-pulse 1.5s ease-in-out infinite;
 }
 
@@ -503,23 +490,62 @@ body.modus-erledigt #liste li {
     color: #64748b;
 }
 
-.list-item-date {
+.list-item-dates {
     flex: 0 0 auto;
-    font-size: 12px;
-    color: #64748b;
-    background: #f1f5f9;
-    border-radius: 999px;
-    padding: 2px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    min-width: 48px;
+}
+
+.list-item-entry-date {
+    font-size: 11px;
+    color: #94a3b8;
     white-space: nowrap;
+}
+
+.list-item-due-wrap {
+    position: relative;
+}
+
+.list-item-due-btn {
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    color: #64748b;
+    white-space: nowrap;
+    cursor: pointer;
+    display: block;
+}
+
+.list-item-due-btn.has-date {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
+}
+
+.list-item-due-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
 }
 
 /* Überfällig – rot */
 #liste li.overdue {
     border-left-color: #dc2626;
 }
-#liste li.overdue .list-item-date {
+#liste li.overdue .list-item-due-btn {
     color: #fff;
     background: #dc2626;
+    border-color: #dc2626;
     font-weight: 600;
 }
 
@@ -527,15 +553,16 @@ body.modus-erledigt #liste li {
 #liste li.due-today {
     border-left-color: #ea580c;
 }
-#liste li.due-today .list-item-date {
+#liste li.due-today .list-item-due-btn {
     color: #fff;
     background: #ea580c;
+    border-color: #ea580c;
     font-weight: 600;
 }
 
 /* Datum-Picker Button */
 .due-date-wrap {
-    grid-area: due;
+    flex: 0 0 auto;
     position: relative;
     display: flex;
 }

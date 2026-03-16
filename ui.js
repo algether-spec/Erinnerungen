@@ -259,19 +259,59 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         li.appendChild(textWrap);
     }
 
-    const dateSpan = document.createElement("span");
-    dateSpan.className = "list-item-date";
-    if (normalizedDueDate) {
-        dateSpan.textContent = formatDueDate(normalizedDueDate);
-        if (!inputErledigt) {
-            const today = getTodayDateString();
-            if (normalizedDueDate < today) li.classList.add("overdue");
-            else if (normalizedDueDate === today) li.classList.add("due-today");
+    const datesWrap = document.createElement("div");
+    datesWrap.className = "list-item-dates";
+
+    const entryDateSpan = document.createElement("span");
+    entryDateSpan.className = "list-item-entry-date";
+    entryDateSpan.textContent = formatEntryDate(normalizedEntryDate);
+    datesWrap.appendChild(entryDateSpan);
+
+    const dueDateWrap = document.createElement("div");
+    dueDateWrap.className = "list-item-due-wrap";
+
+    const dueDateBtn = document.createElement("button");
+    dueDateBtn.type = "button";
+    dueDateBtn.className = "list-item-due-btn";
+
+    const dueDateHidden = document.createElement("input");
+    dueDateHidden.type = "date";
+    dueDateHidden.className = "list-item-due-input";
+    if (normalizedDueDate) dueDateHidden.value = normalizedDueDate;
+
+    function updateDueDateDisplay() {
+        const val = dueDateHidden.value;
+        li.dataset.dueDate = val;
+        if (val) {
+            dueDateBtn.textContent = formatDueDate(val);
+            dueDateBtn.classList.add("has-date");
+            if (!li.classList.contains("erledigt")) {
+                const today = getTodayDateString();
+                li.classList.toggle("overdue", val < today);
+                li.classList.toggle("due-today", val === today);
+            }
+        } else {
+            dueDateBtn.textContent = "📅";
+            dueDateBtn.classList.remove("has-date");
+            li.classList.remove("overdue", "due-today");
         }
-    } else {
-        dateSpan.textContent = formatEntryDate(normalizedEntryDate);
     }
-    li.appendChild(dateSpan);
+    updateDueDateDisplay();
+
+    dueDateBtn.onclick = event => {
+        event.stopPropagation();
+        try { dueDateHidden.showPicker(); } catch { dueDateHidden.click(); }
+    };
+    dueDateHidden.addEventListener("pointerdown", e => e.stopPropagation());
+    dueDateHidden.onchange = () => {
+        updateDueDateDisplay();
+        speichern(true);
+    };
+
+    dueDateWrap.appendChild(dueDateBtn);
+    dueDateWrap.appendChild(dueDateHidden);
+    datesWrap.appendChild(dueDateWrap);
+    li.appendChild(datesWrap);
 
     if (inputErledigt) li.classList.add("erledigt");
 
