@@ -549,6 +549,7 @@ body.modus-erledigt #liste li {
 /* Überfällig – rot */
 #liste li.overdue {
     border-left-color: #dc2626;
+    background: #fff1f2;
 }
 #liste li.overdue .list-item-due-btn {
     color: #fff;
@@ -560,6 +561,7 @@ body.modus-erledigt #liste li {
 /* Heute fällig – orange */
 #liste li.due-today {
     border-left-color: #ea580c;
+    background: #fff7ed;
 }
 #liste li.due-today .list-item-due-btn {
     color: #fff;
@@ -602,7 +604,8 @@ body.modus-erledigt #liste li {
 
 .list-photo-controls {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 6px;
     flex: 1 1 auto;
     min-width: 0;

@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.17";
+const CACHE_VERSION = "v1.0.18";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 // Separater Cache ohne Versionsnummer – überlebt SW-Updates.
