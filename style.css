@@ -86,7 +86,7 @@ header {
     padding: 8px;
     border-radius: 12px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 8px;
     align-items: center;
     position: absolute;
@@ -119,6 +119,10 @@ header {
 
 .auth-logout {
     background: #334155;
+}
+
+.auth-cancel {
+    background: #64748b;
 }
 
 .auth-status {

@@ -22,6 +22,7 @@ const syncDebug      = document.getElementById("sync-debug");
 const authBar        = document.getElementById("auth-bar");
 const syncCodeInput  = document.getElementById("sync-code");
 const btnSyncApply   = document.getElementById("btn-sync-apply");
+const btnSyncCancel  = document.getElementById("btn-sync-cancel");
 const authStatus     = document.getElementById("auth-status");
 
 const multiInput       = document.getElementById("multi-line-input");
