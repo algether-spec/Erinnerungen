@@ -248,8 +248,8 @@ button:disabled {
 
 .input-actions {
     display: grid;
-    grid-template-columns: auto auto 1fr auto auto;
-    grid-template-areas: "mic clear add photo export";
+    grid-template-columns: auto 1fr auto auto auto;
+    grid-template-areas: "mic add clear photo export";
     gap: 6px;
     align-items: stretch;
 }
@@ -264,6 +264,7 @@ button:disabled {
     color: white;
     font-size: 15px;
     grid-area: add;
+    max-width: 130px;
 }
 
 .clear-input-button {
@@ -294,9 +295,9 @@ button:disabled {
 .mic-button {
     background: #ffe4e6;
     color: #9f1239;
-    font-size: 17px;
+    font-size: 22px;
     grid-area: mic;
-    min-width: 40px;
+    min-width: 52px;
 }
 
 .mic-button.listening {
@@ -311,7 +312,7 @@ button:disabled {
 .clear-input-button,
 .add-button,
 .export-button {
-    min-height: 40px;
+    min-height: 52px;
     padding: 8px 10px;
     border: none;
     border-radius: 12px;
