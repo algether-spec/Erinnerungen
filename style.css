@@ -247,7 +247,9 @@ button:disabled {
 }
 
 .input-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto auto 1fr auto auto auto;
+    grid-template-areas: "mic clear add due photo export";
     gap: 6px;
     align-items: stretch;
 }
@@ -261,7 +263,7 @@ button:disabled {
     background: var(--primary);
     color: white;
     font-size: 15px;
-    flex: 1 1 auto;
+    grid-area: add;
 }
 
 .clear-input-button {
@@ -269,7 +271,7 @@ button:disabled {
     color: #b91c1c;
     font-size: 13px;
     font-weight: 700;
-    flex: 0 0 auto;
+    grid-area: clear;
 }
 
 .photo-button {
@@ -277,23 +279,24 @@ button:disabled {
     color: #9a3412;
     font-size: 13px;
     font-weight: 700;
-    flex: 0 0 auto;
+    grid-area: photo;
+    padding: 8px 8px;
 }
 
 .export-button {
     background: linear-gradient(135deg, #0f172a, #334155);
     color: #f8fafc;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.01em;
-    flex: 0 0 auto;
+    grid-area: export;
 }
 
 .mic-button {
     background: #ffe4e6;
     color: #9f1239;
     font-size: 17px;
-    flex: 0 0 auto;
+    grid-area: mic;
 }
 
 .mic-button.listening {
@@ -348,15 +351,19 @@ button:disabled {
     min-height: 28px;
     padding: 4px 10px;
     border-radius: 10px;
-    border: 1px solid #15803d;
-    background: #16a34a;
-    color: #fff;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
     font-size: 12px;
     font-weight: 700;
     margin-left: auto;
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .update-button.update-available {
+    background: #16a34a;
+    border-color: #15803d;
+    color: #fff;
     animation: update-pulse 1.5s ease-in-out infinite;
 }
 
@@ -562,7 +569,7 @@ body.modus-erledigt #liste li {
 
 /* Datum-Picker Button */
 .due-date-wrap {
-    flex: 0 0 auto;
+    grid-area: due;
     position: relative;
     display: flex;
 }
