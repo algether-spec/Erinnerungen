@@ -243,12 +243,60 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         photoControls.appendChild(deleteBtn);
         wrapper.appendChild(photoControls);
 
-        if (entryNote) {
-            const noteSpan = document.createElement("span");
-            noteSpan.className = "list-photo-note";
-            noteSpan.textContent = entryNote;
-            wrapper.appendChild(noteSpan);
-        }
+        const noteWrap = document.createElement("div");
+        noteWrap.className = "list-photo-note-wrap";
+
+        const noteDisplay = document.createElement("span");
+        noteDisplay.className = "list-photo-note" + (entryNote ? "" : " list-photo-note-empty");
+        noteDisplay.textContent = entryNote || "Notiz hinzufügen…";
+        noteWrap.appendChild(noteDisplay);
+
+        noteDisplay.addEventListener("click", event => {
+            event.stopPropagation();
+            if (noteWrap.querySelector("textarea")) return;
+
+            const ta = document.createElement("textarea");
+            ta.className = "list-photo-note-edit";
+            ta.value = li.dataset.note || "";
+            ta.rows = 2;
+            ta.placeholder = "Notiz eingeben…";
+
+            const confirmBtn = document.createElement("button");
+            confirmBtn.type = "button";
+            confirmBtn.className = "list-photo-note-confirm";
+            confirmBtn.textContent = "Fertig";
+
+            const saveNote = () => {
+                const newNote = ta.value.trim();
+                li.dataset.note = newNote;
+                noteDisplay.textContent = newNote || "Notiz hinzufügen…";
+                noteDisplay.classList.toggle("list-photo-note-empty", !newNote);
+                noteDisplay.hidden = false;
+                noteWrap.removeChild(ta);
+                noteWrap.removeChild(confirmBtn);
+                speichern(true);
+            };
+
+            const cancelEdit = () => {
+                noteDisplay.hidden = false;
+                noteWrap.removeChild(ta);
+                noteWrap.removeChild(confirmBtn);
+            };
+
+            confirmBtn.onclick = event => { event.stopPropagation(); saveNote(); };
+            ta.addEventListener("keydown", event => {
+                if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveNote(); }
+                if (event.key === "Escape") cancelEdit();
+            });
+            ta.addEventListener("pointerdown", e => e.stopPropagation());
+
+            noteDisplay.hidden = true;
+            noteWrap.appendChild(ta);
+            noteWrap.appendChild(confirmBtn);
+            ta.focus();
+        });
+
+        wrapper.appendChild(noteWrap);
 
         li.appendChild(wrapper);
     } else {

@@ -629,12 +629,57 @@ body.modus-erledigt #liste li {
     min-width: 0;
 }
 
-.list-photo-note {
+.list-photo-note-wrap {
     grid-column: 2;
     grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.list-photo-note {
     font-size: 13px;
     color: #374151;
     word-break: break-word;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+
+.list-photo-note:hover {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+}
+
+.list-photo-note-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.list-photo-note-edit {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    background: #fff;
+    color: #1e293b;
+    line-height: 1.4;
+}
+
+.list-photo-note-confirm {
+    align-self: flex-end;
+    min-height: 30px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: none;
+    background: #c2410c;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
 }
 
 /* Foto-Beschriftungs-Bereich */
