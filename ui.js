@@ -229,15 +229,15 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         photoControls.className = "list-photo-controls";
         photoControls.appendChild(openBtn);
         photoControls.appendChild(deleteBtn);
+        wrapper.appendChild(photoControls);
 
         if (entryNote) {
             const noteSpan = document.createElement("span");
             noteSpan.className = "list-photo-note";
             noteSpan.textContent = entryNote;
-            photoControls.appendChild(noteSpan);
+            wrapper.appendChild(noteSpan);
         }
 
-        wrapper.appendChild(photoControls);
         li.appendChild(wrapper);
     } else {
         const textWrap = document.createElement("span");
