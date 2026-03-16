@@ -1034,24 +1034,13 @@ body.modus-erledigt #liste li {
 
 .export-footer {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     margin-top: 16px;
 }
 
-.export-cancel-btn {
-    flex: 1;
-    min-height: 44px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid #cbd5e1;
-    background: #f1f5f9;
-    color: #475569;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.export-run-btn {
-    flex: 2;
+.export-html-btn {
+    width: 100%;
     min-height: 44px;
     padding: 10px 14px;
     border-radius: 10px;
@@ -1060,6 +1049,33 @@ body.modus-erledigt #liste li {
     color: #ffffff;
     font-size: 15px;
     font-weight: 700;
+    cursor: pointer;
+}
+
+.export-mail-btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    background: #1d4ed8;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.export-cancel-btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 .input-error-status {
