@@ -388,8 +388,13 @@ function ladenLokal() {
 
 function speichern(forceOverwrite = false) {
     const daten = datenAusListeLesen();
-    speichernLokal(daten);
-    localDirty = true;
+    localDirty = true; // immer zuerst – auch wenn lokales Speichern scheitert
+    try {
+        speichernLokal(daten);
+    } catch (err) {
+        // QuotaExceededError: localStorage voll (häufig nach mehreren Fotos)
+        console.warn("Lokales Speichern fehlgeschlagen:", err);
+    }
     void syncRemoteIfNeeded(forceOverwrite);
 }
 
@@ -460,8 +465,14 @@ async function refreshFromRemoteIfChanged() {
         }
 
         if (listDataSignature(normalizedRemote) !== listDataSignature(lokaleDaten)) {
-            datenInListeSchreiben(normalizedRemote);
-            speichernLokal(normalizedRemote);
+            // Lokal vorhandene Fotos bewahren, die noch nicht auf Remote gespeichert wurden
+            const remoteIds = new Set(normalizedRemote.map(e => e.itemId));
+            const lokaleFotos = lokaleDaten.filter(e => isPhotoEntryText(e.text) && !remoteIds.has(e.itemId));
+            const zuSchreiben = lokaleFotos.length > 0
+                ? [...normalizedRemote, ...lokaleFotos].map((e, i) => ({ ...e, position: i }))
+                : normalizedRemote;
+            datenInListeSchreiben(zuSchreiben);
+            try { speichernLokal(zuSchreiben); } catch (_) {}
             authStatusSetzen("Liste von anderem Geraet aktualisiert.");
         }
 
