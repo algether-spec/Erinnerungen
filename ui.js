@@ -263,38 +263,61 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
             ta.rows = 2;
             ta.placeholder = "Notiz eingeben…";
 
+            const btnRow = document.createElement("div");
+            btnRow.className = "list-photo-note-actions";
+
             const confirmBtn = document.createElement("button");
             confirmBtn.type = "button";
             confirmBtn.className = "list-photo-note-confirm";
             confirmBtn.textContent = "Fertig";
 
+            const cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.className = "list-photo-note-cancel";
+            cancelBtn.textContent = "✕";
+
+            let _editActive = true;
+
             const saveNote = () => {
+                if (!_editActive) return;
+                _editActive = false;
+                ta.blur();
                 const newNote = ta.value.trim();
                 li.dataset.note = newNote;
                 noteDisplay.textContent = newNote || "Notiz hinzufügen…";
                 noteDisplay.classList.toggle("list-photo-note-empty", !newNote);
                 noteDisplay.hidden = false;
                 noteWrap.removeChild(ta);
-                noteWrap.removeChild(confirmBtn);
+                noteWrap.removeChild(btnRow);
                 speichern(true);
             };
 
             const cancelEdit = () => {
+                if (!_editActive) return;
+                _editActive = false;
+                ta.blur();
                 noteDisplay.hidden = false;
                 noteWrap.removeChild(ta);
-                noteWrap.removeChild(confirmBtn);
+                noteWrap.removeChild(btnRow);
             };
 
             confirmBtn.onclick = event => { event.stopPropagation(); saveNote(); };
+            cancelBtn.onclick = event => { event.stopPropagation(); cancelEdit(); };
             ta.addEventListener("keydown", event => {
                 if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveNote(); }
                 if (event.key === "Escape") cancelEdit();
             });
             ta.addEventListener("pointerdown", e => e.stopPropagation());
+            ta.addEventListener("blur", () => {
+                setTimeout(() => { if (_editActive) saveNote(); }, 150);
+            });
+
+            btnRow.appendChild(cancelBtn);
+            btnRow.appendChild(confirmBtn);
 
             noteDisplay.hidden = true;
             noteWrap.appendChild(ta);
-            noteWrap.appendChild(confirmBtn);
+            noteWrap.appendChild(btnRow);
             ta.focus();
             setTimeout(() => ta.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
         });
@@ -1150,3 +1173,16 @@ if (btnExportDeselectAll) {
 document.querySelectorAll("input[name=export-filter]").forEach(radio => {
     radio.onchange = () => exportModalFuellenEintraege(radio.value);
 });
+
+
+/* --- Tastatur schließen bei Tap außerhalb ----------------------- */
+
+document.addEventListener("pointerdown", event => {
+    const active = document.activeElement;
+    if (!active || (active.tagName !== "INPUT" && active.tagName !== "TEXTAREA")) return;
+    const inputAreas = [".input-section", ".list-photo-note-wrap", ".auth-bar", ".photo-caption-area"];
+    const isInInputArea = inputAreas.some(sel => active.closest(sel));
+    if (!isInInputArea) return;
+    const tappedInInputArea = inputAreas.some(sel => event.target.closest(sel));
+    if (!tappedInInputArea) active.blur();
+}, { passive: true });
