@@ -1186,3 +1186,22 @@ document.addEventListener("pointerdown", event => {
     const tappedInInputArea = inputAreas.some(sel => event.target.closest(sel));
     if (!tappedInInputArea) active.blur();
 }, { passive: true });
+
+
+/* --- iOS Zoom-Reset nach Tastatur schließen --------------------- */
+
+function zoomZuruecksetzen() {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) return;
+    const original = viewport.content;
+    viewport.content = original.includes("maximum-scale")
+        ? original
+        : original + ", maximum-scale=1";
+    setTimeout(() => { viewport.content = original; }, 300);
+}
+
+document.addEventListener("focusout", event => {
+    if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") {
+        zoomZuruecksetzen();
+    }
+}, { passive: true });
