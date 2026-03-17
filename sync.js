@@ -759,6 +759,10 @@ function syncCodeUiEinrichten(initOptions = {}) {
         btnSyncCodeShare.onclick = () => void syncCodeTeilen();
     }
 
+    if (typeof btnSyncCancel !== "undefined" && btnSyncCancel) {
+        btnSyncCancel.onclick = () => syncBearbeitungsmodusSetzen(false);
+    }
+
     geraetRolleUiAktualisieren();
 
     return initPromise;

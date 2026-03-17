@@ -5,7 +5,7 @@
 
     <title>Erinnerungen</title>
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#c2410c">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta
@@ -63,8 +63,9 @@
             maxlength="8"
             pattern="[A-Za-z]{4}[0-9]{4}"
             autocapitalize="characters"
-            placeholder="Geraete-Code (z. B. LUIS0090)">
+            placeholder="Geraete-Code (z. B. AAAA0000)">
         <button type="button" id="btn-sync-apply" class="auth-button">Verbinden</button>
+        <button type="button" id="btn-sync-cancel" class="auth-button auth-cancel">Abbrechen</button>
         <div id="auth-status" class="auth-status"></div>
     </div>
 
@@ -214,7 +215,7 @@
     </div>
 
     <div class="version-row">
-        <div class="version-badge" id="version-badge">v1.0.38</div>
+        <div class="version-badge" id="version-badge">v1.0.40</div>
     </div>
     <div class="version-subline">von Al.Gether</div>
     <div class="sync-status" id="sync-status">Sync: Lokal</div>
