@@ -621,6 +621,8 @@ async function optimizePhotoDataUrl(dataUrl) {
 }
 
 let pendingPhotoSrc = "";
+let photoLoading = false;
+let photoLoadTimeout = null;
 
 function photoCaptionBereich(show) {
     if (!photoCaptionArea) return;
@@ -632,23 +634,45 @@ function photoCaptionBereich(show) {
     }
 }
 
+function fotoZuruecksetzen() {
+    photoLoading = false;
+    if (photoLoadTimeout) { clearTimeout(photoLoadTimeout); photoLoadTimeout = null; }
+    if (btnPhotoOcr) btnPhotoOcr.disabled = false;
+    if (photoOcrInput) {
+        photoOcrInput.value = "";
+        photoOcrInput.type = "";
+        photoOcrInput.type = "file";
+    }
+    photoCaptionBereich(false);
+}
+
 async function addPhotoAsListItem(file) {
-    if (!file) return;
+    if (!file || photoLoading) return;
+    photoLoading = true;
     if (btnPhotoOcr) btnPhotoOcr.disabled = true;
     mikStatusSetzen("Foto wird geladen...");
 
+    photoLoadTimeout = setTimeout(() => {
+        mikStatusSetzen("Foto-Laden abgebrochen (Timeout).");
+        fotoZuruecksetzen();
+    }, 10000);
+
     try {
         const imageSrc = await readFileAsDataUrl(file);
+        if (!photoLoading) return;
         const optimizedImageSrc = await optimizePhotoDataUrl(imageSrc);
+        if (!photoLoading) return;
         pendingPhotoSrc = optimizedImageSrc;
         if (photoCaptionPreview) photoCaptionPreview.src = optimizedImageSrc;
-        if (photoCaptionText) { photoCaptionText.value = ""; }
+        if (photoCaptionText) photoCaptionText.value = "";
         photoCaptionBereich(true);
         mikStatusSetzen("Beschreibung eingeben und Foto speichern.");
-    } catch (err) {
-        console.warn("Foto konnte nicht hinzugefuegt werden:", err);
+    } catch {
         mikStatusSetzen("Foto konnte nicht gelesen werden.");
+        fotoZuruecksetzen();
     } finally {
+        photoLoading = false;
+        if (photoLoadTimeout) { clearTimeout(photoLoadTimeout); photoLoadTimeout = null; }
         if (btnPhotoOcr) btnPhotoOcr.disabled = false;
         if (photoOcrInput) {
             photoOcrInput.value = "";
@@ -660,16 +684,21 @@ async function addPhotoAsListItem(file) {
 
 function photoCaptionSpeichern() {
     if (!pendingPhotoSrc) return;
-    const note = photoCaptionText ? photoCaptionText.value.trim() : "";
-    eintragAnlegen({ text: IMAGE_ENTRY_PREFIX + pendingPhotoSrc, note });
-    speichern();
-    photoCaptionBereich(false);
-    mikStatusSetzen("Foto zur Liste hinzugefügt.");
+    try {
+        const note = photoCaptionText ? photoCaptionText.value.trim() : "";
+        eintragAnlegen({ text: IMAGE_ENTRY_PREFIX + pendingPhotoSrc, note });
+        speichern();
+        mikStatusSetzen("Foto zur Liste hinzugefügt.");
+    } catch {
+        mikStatusSetzen("Foto konnte nicht gespeichert werden.");
+    } finally {
+        fotoZuruecksetzen();
+    }
 }
 
 if (btnPhotoCaptionSave) btnPhotoCaptionSave.onclick = photoCaptionSpeichern;
 if (btnPhotoCaptionCancel) btnPhotoCaptionCancel.onclick = () => {
-    photoCaptionBereich(false);
+    fotoZuruecksetzen();
     mikStatusSetzen("Foto abgebrochen.");
 };
 
