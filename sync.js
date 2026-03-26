@@ -336,16 +336,24 @@ function mergeListConflict(localDaten, remoteDaten) {
     const merged = [];
     const seenById = new Set();
 
+    const remoteById = new Map(remote.map(e => [e.itemId, e]));
+
     for (const item of local) {
         if (seenById.has(item.itemId)) continue;
         seenById.add(item.itemId);
-        merged.push({ ...item, position: merged.length });
+        const remoteItem = remoteById.get(item.itemId);
+        const mergedItem = remoteItem
+            ? { ...remoteItem, erledigt: item.erledigt, position: merged.length }
+            : { ...item, position: merged.length };
+        merged.push(mergedItem);
     }
+
     for (const item of remote) {
         if (seenById.has(item.itemId)) continue;
         seenById.add(item.itemId);
         merged.push({ ...item, position: merged.length });
     }
+
     return merged;
 }
 
