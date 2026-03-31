@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.46";
+const CACHE_VERSION = "v1.0.47";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 // Separater Cache ohne Versionsnummer – überlebt SW-Updates.
@@ -38,23 +38,16 @@ self.addEventListener("install", event => {
 
 /* ACTIVATE */
 self.addEventListener("activate", event => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    const oldCaches = keys.filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE);
-
-    // Alten Cache löschen
-    await Promise.all(oldCaches.map(key => caches.delete(key)));
-
-    // Alle offenen Seiten übernehmen
-    await self.clients.claim();
-
-    // Nur bei echtem Update (nicht bei Erstinstallation oder nach manuellem Löschen)
-    // alle Tabs neu laden, damit sie nicht mit alter JS/CSS weiterarbeiten.
-    if (oldCaches.length > 0) {
-      const clients = await self.clients.matchAll({ type: "window" });
-      clients.forEach(c => c.postMessage({ type: "SW_UPDATED" }));
-    }
-  })());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE)
+          .map(key => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
 });
 
 self.addEventListener("message", event => {
