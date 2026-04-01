@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.46";
+const CACHE_VERSION = "v1.0.50";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 // Separater Cache ohne Versionsnummer – überlebt SW-Updates.
@@ -38,29 +38,19 @@ self.addEventListener("install", event => {
 
 /* ACTIVATE */
 self.addEventListener("activate", event => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    const oldCaches = keys.filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE);
-
-    // Alten Cache löschen
-    await Promise.all(oldCaches.map(key => caches.delete(key)));
-
-    // Alle offenen Seiten übernehmen
-    await self.clients.claim();
-
-    // Nur bei echtem Update (nicht bei Erstinstallation oder nach manuellem Löschen)
-    // alle Tabs neu laden, damit sie nicht mit alter JS/CSS weiterarbeiten.
-    if (oldCaches.length > 0) {
-      const clients = await self.clients.matchAll({ type: "window" });
-      clients.forEach(c => c.postMessage({ type: "SW_UPDATED" }));
-    }
-  })());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE)
+          .map(key => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
 });
 
 self.addEventListener("message", event => {
-  if (event.data?.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
   if (event.data?.type === "SET_INSTALL_CONTEXT") {
     _manifestInstallContext = {
       joinToken: String(event.data.joinToken || ""),
@@ -129,8 +119,11 @@ self.addEventListener("fetch", event => {
   const sameOrigin = requestUrl.origin === self.location.origin;
   const cacheKeyByPath = requestUrl.pathname === "/" ? "./index.html" : `.${requestUrl.pathname}`;
 
-  // version.json immer frisch vom Netz – nie aus Cache
-  if (sameOrigin && requestUrl.pathname.endsWith("/version.json")) {
+  // version.json und service-worker.js immer frisch vom Netz – nie aus Cache
+  if (sameOrigin && (
+    requestUrl.pathname.endsWith("/version.json") ||
+    requestUrl.pathname.endsWith("/service-worker.js")
+  )) {
     event.respondWith(fetch(request).catch(() => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     return;
   }

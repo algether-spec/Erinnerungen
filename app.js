@@ -79,11 +79,10 @@ if (supabaseClient) {
 }
 
 if ("serviceWorker" in navigator) {
-    // Nach SW-Update alle Tabs neu laden, damit keine alten Skripte aktiv bleiben.
-    navigator.serviceWorker.addEventListener("message", event => {
-        if (event.data?.type === "SW_UPDATED") window.location.reload();
+    // Nach SW-Update Seite neu laden, damit neue JS/CSS aktiv werden.
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+        window.location.reload();
     });
-
     navigator.serviceWorker.register("service-worker.js?v=" + APP_VERSION, { updateViaCache: "none" });
     navigator.serviceWorker.ready.then(reg => {
         const _swCode = localStorage.getItem(SYNC_CODE_PERMANENT_KEY) || localStorage.getItem(SYNC_CODE_KEY);
