@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.49";
+const CACHE_VERSION = "v1.0.50";
 const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
 
 // Separater Cache ohne Versionsnummer – überlebt SW-Updates.
@@ -51,9 +51,6 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("message", event => {
-  if (event.data?.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
   if (event.data?.type === "SET_INSTALL_CONTEXT") {
     _manifestInstallContext = {
       joinToken: String(event.data.joinToken || ""),
@@ -122,8 +119,11 @@ self.addEventListener("fetch", event => {
   const sameOrigin = requestUrl.origin === self.location.origin;
   const cacheKeyByPath = requestUrl.pathname === "/" ? "./index.html" : `.${requestUrl.pathname}`;
 
-  // version.json immer frisch vom Netz – nie aus Cache
-  if (sameOrigin && requestUrl.pathname.endsWith("/version.json")) {
+  // version.json und service-worker.js immer frisch vom Netz – nie aus Cache
+  if (sameOrigin && (
+    requestUrl.pathname.endsWith("/version.json") ||
+    requestUrl.pathname.endsWith("/service-worker.js")
+  )) {
     event.respondWith(fetch(request).catch(() => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     return;
   }
