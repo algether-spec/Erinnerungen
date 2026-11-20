@@ -174,15 +174,15 @@ async function joinTokenInSupabaseSpeichern(joinToken, rolle, syncCode, options 
     }
 }
 
+// Löst den Token serverseitig ein: liefert Rolle + Code und trägt dieses
+// Gerät als Mitglied ein. Direktes Lesen der Tabelle ist gesperrt.
 async function joinTokenAusSupabaseLaden(joinToken) {
     if (!supabaseClient || !joinToken) return null;
     if (!(await authSicherstellen())) return null;
     try {
-        const { data, error } = await supabaseClient
-            .from("device_join_tokens")
-            .select("rolle, sync_code, expires_at")
-            .eq("join_token", joinToken)
-            .maybeSingle();
+        const { data, error } = await supabaseClient.rpc("redeem_join_token", {
+            p_token: String(joinToken)
+        });
         if (error || !data?.rolle || !data?.sync_code) return null;
         if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null;
         return {
@@ -220,15 +220,15 @@ async function geraetStatusMitJoinTokenRegistrieren(deviceId, joinToken) {
     }
 }
 
+// Löst eine ältere Einladung (#invite=<device_id>) serverseitig ein:
+// liefert den Sync-Code und trägt dieses Gerät als Mitglied ein.
 async function syncCodeAusEinladungLaden(deviceId) {
     if (!supabaseClient || !deviceId) return null;
     if (!(await authSicherstellen())) return null;
     try {
-        const { data, error } = await supabaseClient
-            .from("sync_invites")
-            .select("sync_code")
-            .eq("device_id", deviceId)
-            .single();
+        const { data, error } = await supabaseClient.rpc("redeem_legacy_invite", {
+            p_device_id: String(deviceId)
+        });
         if (error || !data?.sync_code) return null;
         return String(data.sync_code);
     } catch (err) {
@@ -282,6 +282,8 @@ async function syncCodeRpcVerwenden(code, options = {}) {
         p_require_new: requireNew
     });
     if (error) throw error;
+    // Server meldet "Code belegt/unbekannt" als JSON, damit Versuche gezählt werden
+    if (data?.error) throw new Error(String(data.error));
     return data;
 }
 
