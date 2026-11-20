@@ -297,9 +297,28 @@ async function syncCodeNutzungAktualisieren(code) {
 
 /* --- Erinnerungen Data Operations ------------------------------- */
 
+// Ohne Mitgliedschaft liefert die Datenbank eine LEERE Liste statt eines Fehlers.
+// Das darf nie als "alles gelöscht" gelten → vor jedem Lesen/Schreiben sicherstellen,
+// dass der aktuelle User (kann sich z. B. durch die mit der Einkaufsliste geteilte
+// Anmeldung ändern) Mitglied des Codes ist. Einmal pro User + Code.
+let mitgliedschaftBestaetigt = "";
+
+async function mitgliedschaftSicherstellen() {
+    if (!istGueltigerSyncCode(currentSyncCode) || istReservierterSyncCode(currentSyncCode)) return false;
+    const { data } = await supabaseClient.auth.getSession();
+    const userId = data?.session?.user?.id;
+    if (!userId) return false;
+    const key = `${userId}:${currentSyncCode}`;
+    if (mitgliedschaftBestaetigt === key) return true;
+    await syncCodeRpcVerwenden(currentSyncCode, { allowCreate: true, requireNew: false });
+    mitgliedschaftBestaetigt = key;
+    return true;
+}
+
 async function ladenRemote() {
     if (!supabaseClient) return null;
     if (!(await authSicherstellen())) return null;
+    if (!(await mitgliedschaftSicherstellen())) return null;
 
     const { data, error } = await supabaseClient
         .from(SUPABASE_TABLE)
@@ -327,6 +346,7 @@ async function speichernRemote(daten, options = {}) {
     const allowRemoteDeletes = options.allowRemoteDeletes === true;
     if (!supabaseClient) return;
     if (!(await authSicherstellen())) return;
+    if (!(await mitgliedschaftSicherstellen())) throw new Error("SYNC_CODE_NOT_JOINED");
 
     if (!daten.length) {
         const { error: deleteAllError } = await supabaseClient
