@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1.0.52-dev";
+const CACHE_VERSION = "v1.0.53-dev";
 
 // Produktion (/Erinnerungen/), Testversion (/Erinnerungen/dev/) und die
 // Einkaufsliste teilen sich dieselbe Domain und damit denselben CacheStorage

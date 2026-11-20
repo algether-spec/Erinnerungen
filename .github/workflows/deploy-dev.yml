@@ -22,7 +22,7 @@ jobs:
       - name: Copy dev files to main/dev subfolder
         run: |
           mkdir -p main-branch/dev
-          rsync -av --exclude='.git' --exclude='.github' --exclude='main-branch' . main-branch/dev/
+          rsync -av --checksum --exclude='.git' --exclude='.github' --exclude='main-branch' . main-branch/dev/
 
       - name: Commit and push to main
         run: |
