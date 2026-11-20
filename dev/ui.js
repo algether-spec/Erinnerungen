@@ -228,7 +228,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
         deleteBtn.onclick = event => {
             event.stopPropagation();
             li.remove();
-            speichern(true);
+            speichern();
             mikStatusSetzen("Foto gelöscht.");
         };
 
@@ -289,7 +289,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
                 noteDisplay.hidden = false;
                 noteWrap.removeChild(ta);
                 noteWrap.removeChild(btnRow);
-                speichern(true);
+                speichern();
             };
 
             const cancelEdit = () => {
@@ -390,7 +390,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
     dueDateHidden.addEventListener("pointerdown", e => e.stopPropagation());
     dueDateHidden.onchange = () => {
         updateDueDateDisplay();
-        speichern(true);
+        speichern();
     };
 
     dueDateWrap.appendChild(dueDateBtn);
@@ -428,7 +428,7 @@ function eintragAnlegen(text, erledigt = false, itemId = generateItemId(), creat
                 li.classList.add("erledigt");
             }
             sortListByReminderDate();
-            speichern(true);
+            speichern();
         }, 500);
     });
 
@@ -460,7 +460,7 @@ function modusSetzen(neu) {
 
     if (vorher === MODUS_ERLEDIGT && neu === MODUS_ERFASSEN) {
         liste.querySelectorAll("li.erledigt").forEach(li => li.remove());
-        speichern(true);
+        speichern();
     }
 }
 

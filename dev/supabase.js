@@ -342,63 +342,49 @@ async function ladenRemote() {
     }));
 }
 
-async function speichernRemote(daten, options = {}) {
-    const allowRemoteDeletes = options.allowRemoteDeletes === true;
-    if (!supabaseClient) return;
-    if (!(await authSicherstellen())) return;
+async function remoteBereitstellen() {
+    if (!supabaseClient || !(await authSicherstellen())) throw new Error("network offline");
     if (!(await mitgliedschaftSicherstellen())) throw new Error("SYNC_CODE_NOT_JOINED");
+}
 
-    if (!daten.length) {
-        const { error: deleteAllError } = await supabaseClient
-            .from(SUPABASE_TABLE)
-            .delete()
-            .eq("sync_code", currentSyncCode);
-        if (deleteAllError) throw deleteAllError;
-        return;
-    }
-
-    const payload = daten.map((e, index) => ({
+function eintragAlsZeile(e) {
+    return {
         sync_code: currentSyncCode,
-        item_id: String(e.itemId || "").trim() || generateItemId(),
+        item_id: String(e.itemId),
         text: String(e.text || e.title || ""),
         title: String(e.title || e.text || ""),
         note: String(e.note || ""),
-        erledigt: e.erledigt,
-        position: index,
+        erledigt: Boolean(e.erledigt),
+        position: e.position,
         created_at: normalizeDateIso(e.createdAt) || extractDateFromItemId(e.itemId) || new Date().toISOString(),
         entry_date:
             normalizeDateIso(e.entryDate || e.createdAt)
             || extractDateFromItemId(e.itemId)
             || new Date().toISOString(),
         due_date: e.dueDate ? String(e.dueDate).slice(0, 10) : null
-    }));
+    };
+}
 
-    const { error: upsertError } = await supabaseClient
+// Neue oder geänderte Einträge hochladen
+async function eintraegeHochladen(daten) {
+    if (!daten.length) return;
+    await remoteBereitstellen();
+    const { error } = await supabaseClient
         .from(SUPABASE_TABLE)
-        .upsert(payload, { onConflict: "sync_code,item_id" });
+        .upsert(daten.map(eintragAlsZeile), { onConflict: "sync_code,item_id" });
+    if (error) throw error;
+}
 
-    if (upsertError) throw upsertError;
-
-    if (allowRemoteDeletes) {
-        const localItemIdSet = new Set(payload.map(item => item.item_id));
-        const { data: remoteRows, error: remoteRowsError } = await supabaseClient
-            .from(SUPABASE_TABLE)
-            .select("item_id")
-            .eq("sync_code", currentSyncCode);
-
-        if (remoteRowsError) throw remoteRowsError;
-        const remoteItemIds = (remoteRows || []).map(row => String(row.item_id || "").trim()).filter(Boolean);
-        const obsoleteItemIds = remoteItemIds.filter(itemId => !localItemIdSet.has(itemId));
-
-        if (obsoleteItemIds.length > 0) {
-            const { error: deleteObsoleteError } = await supabaseClient
-                .from(SUPABASE_TABLE)
-                .delete()
-                .eq("sync_code", currentSyncCode)
-                .in("item_id", obsoleteItemIds);
-            if (deleteObsoleteError) throw deleteObsoleteError;
-        }
-    }
+// Nur gezielt die angegebenen Einträge löschen – nie pauschal
+async function eintraegeRemoteLoeschen(itemIds) {
+    if (!itemIds.length) return;
+    await remoteBereitstellen();
+    const { error } = await supabaseClient
+        .from(SUPABASE_TABLE)
+        .delete()
+        .eq("sync_code", currentSyncCode)
+        .in("item_id", itemIds);
+    if (error) throw error;
 }
 
 

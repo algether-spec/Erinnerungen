@@ -15,7 +15,8 @@ let hintergrundTimer = null;
 let updatePruefTimer = null;
 let remoteSyncInFlight = false;
 let remoteSyncQueued = false;
-let remoteSyncForceOverwrite = false;
+let lokaleAenderungen = 0;
+let lokalSpeicherFehler = false;
 let remotePullInFlight = false;
 let localDirty = false;
 let _geraeteAnzahlTimer = null;
@@ -330,31 +331,65 @@ function listDataSignature(daten) {
     );
 }
 
-function mergeListConflict(localDaten, remoteDaten) {
-    const local = normalizeListData(localDaten);
-    const remote = normalizeListData(remoteDaten);
-    const merged = [];
-    const seenById = new Set();
+/* --- Drei-Wege-Abgleich ----------------------------------------- */
+// Basis = IDs, die beim letzten erfolgreichen Abgleich auf dem Server UND in der
+// lokalen Liste waren. Nur damit lässt sich unterscheiden, ob ein fehlender
+// Eintrag gelöscht wurde oder neu ist.
 
-    const remoteById = new Map(remote.map(e => [e.itemId, e]));
-
-    for (const item of local) {
-        if (seenById.has(item.itemId)) continue;
-        seenById.add(item.itemId);
-        const remoteItem = remoteById.get(item.itemId);
-        const mergedItem = remoteItem
-            ? { ...remoteItem, erledigt: item.erledigt, position: merged.length }
-            : { ...item, position: merged.length };
-        merged.push(mergedItem);
+function syncBasisLaden() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(SYNC_BASIS_KEY) || "null");
+        if (raw?.code !== currentSyncCode || !Array.isArray(raw.ids)) return null;
+        return new Set(raw.ids);
+    } catch (_) {
+        return null;
     }
+}
 
-    for (const item of remote) {
-        if (seenById.has(item.itemId)) continue;
-        seenById.add(item.itemId);
-        merged.push({ ...item, position: merged.length });
+// Basis nur speichern, wenn auch die lokale Liste gespeichert ist – sonst könnte
+// nach einem Neustart ein Eintrag fälschlich als "lokal gelöscht" gelten.
+function syncBasisSetzen(daten) {
+    try {
+        if (lokalSpeicherFehler) {
+            localStorage.removeItem(SYNC_BASIS_KEY);
+            return;
+        }
+        const ids = daten.map(e => e.itemId);
+        localStorage.setItem(SYNC_BASIS_KEY, JSON.stringify({ code: currentSyncCode, ids }));
+    } catch (_) {}
+}
+
+function lokalMitBasisSpeichern(daten) {
+    try {
+        localStorage.removeItem(SYNC_BASIS_KEY);
+        speichernLokal(daten);
+        lokalSpeicherFehler = false;
+    } catch (err) {
+        console.warn("Lokales Speichern fehlgeschlagen:", err);
+        lokalSpeicherFehler = true;
     }
+    syncBasisSetzen(daten);
+}
 
-    return merged;
+function listenAbgleichen(lokal, remote, basis) {
+    const remoteIds = new Set(remote.map(e => e.itemId));
+    const lokalIds = new Set(lokal.map(e => e.itemId));
+    // lokal vorhanden: behalten, außer er war schon auf dem Server und ist dort gelöscht
+    const behalten = lokal.filter(e => remoteIds.has(e.itemId) || !basis.has(e.itemId));
+    const nurRemote = remote.filter(e => !lokalIds.has(e.itemId));
+    const neuRemote = nurRemote.filter(e => !basis.has(e.itemId));
+    const loeschen = nurRemote.filter(e => basis.has(e.itemId)).map(e => e.itemId);
+    const daten = [...behalten, ...neuRemote].map((e, i) => ({ ...e, position: i }));
+    return { daten, loeschen };
+}
+
+function eintragSignatur(e) {
+    return JSON.stringify([e.text, e.title, e.note, e.erledigt, e.dueDate || "", e.position]);
+}
+
+function geaenderteEintraege(daten, remote) {
+    const remoteSig = new Map(remote.map(e => [e.itemId, eintragSignatur(e)]));
+    return daten.filter(e => remoteSig.get(e.itemId) !== eintragSignatur(e));
 }
 
 
@@ -394,23 +429,61 @@ function ladenLokal() {
 
 /* --- Sync-Hauptlogik -------------------------------------------- */
 
-function speichern(forceOverwrite = false) {
+function speichern() {
     const daten = datenAusListeLesen();
     localDirty = true; // immer zuerst – auch wenn lokales Speichern scheitert
+    lokaleAenderungen += 1;
     try {
         speichernLokal(daten);
+        lokalSpeicherFehler = false;
     } catch (err) {
-        // QuotaExceededError: localStorage voll (häufig nach mehreren Fotos)
+        // QuotaExceededError (häufig nach mehreren Fotos): gespeicherte Liste ist
+        // jetzt älter als die Basis → Basis verwerfen, damit nichts falsch gelöscht wird
         console.warn("Lokales Speichern fehlgeschlagen:", err);
+        lokalSpeicherFehler = true;
+        try { localStorage.removeItem(SYNC_BASIS_KEY); } catch (_) {}
     }
-    void syncRemoteIfNeeded(forceOverwrite);
+    void syncRemoteIfNeeded();
 }
 
-async function syncRemoteIfNeeded(forceOverwrite = false) {
+// Ein Abgleich: Server holen, drei Wege vergleichen, gezielt hochladen/löschen
+async function einmalAbgleichen() {
+    const stand = lokaleAenderungen;
+    const lokal = normalizeListData(datenAusListeLesen());
+    const remoteRoh = await ladenRemote();
+    if (!Array.isArray(remoteRoh)) throw new Error("network offline");
+    const remote = normalizeListData(remoteRoh);
+    const basis = syncBasisLaden();
+
+    // Ohne Basis (erster Start, Code-Wechsel): Server-Stand gilt, wie bisher
+    const { daten, loeschen } = basis
+        ? listenAbgleichen(lokal, remote, basis)
+        : { daten: remote.length ? remote : lokal, loeschen: [] };
+
+    await eintraegeHochladen(geaenderteEintraege(daten, remote));
+    await eintraegeRemoteLoeschen(loeschen);
+
+    // Nutzer hat während des Abgleichs etwas geändert → Liste nicht überschreiben, nochmal.
+    // Basis = lokal bekannte Einträge, die jetzt auf dem Server sind (sonst käme ein
+    // gerade hochgeladener und gleich wieder gelöschter Eintrag zurück).
+    if (stand !== lokaleAenderungen) {
+        const lokalIds = new Set(lokal.map(e => e.itemId));
+        syncBasisSetzen(daten.filter(e => lokalIds.has(e.itemId)));
+        remoteSyncQueued = true;
+        return;
+    }
+    if (listDataSignature(daten) !== listDataSignature(lokal)) {
+        datenInListeSchreiben(daten);
+        authStatusSetzen("Liste mit anderem Geraet abgeglichen.");
+    }
+    lokalMitBasisSpeichern(daten);
+    localDirty = false;
+}
+
+async function syncRemoteIfNeeded() {
     if (!supabaseClient) return;
     if (remoteSyncInFlight) {
         remoteSyncQueued = true;
-        remoteSyncForceOverwrite = remoteSyncForceOverwrite || forceOverwrite;
         return;
     }
 
@@ -418,32 +491,10 @@ async function syncRemoteIfNeeded(forceOverwrite = false) {
     try {
         syncStatusSetzen("Sync: Synchronisiere...", "warn");
         do {
-            const overwriteThisRun = forceOverwrite || remoteSyncForceOverwrite;
-            forceOverwrite = false;
-            remoteSyncForceOverwrite = false;
             remoteSyncQueued = false;
-            const lokaleDaten = normalizeListData(datenAusListeLesen());
-            let datenZumSpeichern = lokaleDaten;
-
-            if (!overwriteThisRun) {
-                const remoteVorher = await ladenRemote();
-                if (Array.isArray(remoteVorher)) {
-                    const remoteDaten = normalizeListData(remoteVorher);
-                    if (listDataSignature(lokaleDaten) !== listDataSignature(remoteDaten)) {
-                        datenZumSpeichern = mergeListConflict(lokaleDaten, remoteDaten);
-                        if (listDataSignature(datenZumSpeichern) !== listDataSignature(lokaleDaten)) {
-                            datenInListeSchreiben(datenZumSpeichern);
-                            speichernLokal(datenZumSpeichern);
-                            authStatusSetzen("Konflikt erkannt: Listen wurden zusammengefuehrt.");
-                        }
-                    }
-                }
-            }
-
-            await speichernRemote(datenZumSpeichern, { allowRemoteDeletes: overwriteThisRun });
+            await einmalAbgleichen();
         } while (remoteSyncQueued);
         lastSyncAt = formatTimeIso(new Date());
-        localDirty = false;
         syncStatusSetzen("Sync: Verbunden", "ok");
         syncDebugAktualisieren();
     } catch (err) {
@@ -456,32 +507,32 @@ async function syncRemoteIfNeeded(forceOverwrite = false) {
     }
 }
 
+// Hintergrund: Server-Stand übernehmen. Ungespeicherte lokale Änderungen
+// gehen über den Abgleich (der auch Löschungen richtig behandelt).
 async function refreshFromRemoteIfChanged() {
     if (!supabaseClient) return;
     if (remoteSyncInFlight || remotePullInFlight) return;
+    if (localDirty) {
+        void syncRemoteIfNeeded();
+        return;
+    }
 
     remotePullInFlight = true;
+    const stand = lokaleAenderungen;
     try {
         const remoteDaten = await ladenRemote();
         if (!Array.isArray(remoteDaten)) return;
+        // Inzwischen lokal geändert oder Abgleich gestartet → veraltete Antwort verwerfen
+        if (stand !== lokaleAenderungen || remoteSyncInFlight || localDirty) return;
 
         const normalizedRemote = normalizeListData(remoteDaten);
         const lokaleDaten = normalizeListData(datenAusListeLesen());
-
-        if (localDirty && listDataSignature(normalizedRemote) !== listDataSignature(lokaleDaten)) {
-            return;
-        }
-
         if (listDataSignature(normalizedRemote) !== listDataSignature(lokaleDaten)) {
-            // Lokal vorhandene Fotos bewahren, die noch nicht auf Remote gespeichert wurden
-            const remoteIds = new Set(normalizedRemote.map(e => e.itemId));
-            const lokaleFotos = lokaleDaten.filter(e => isPhotoEntryText(e.text) && !remoteIds.has(e.itemId));
-            const zuSchreiben = lokaleFotos.length > 0
-                ? [...normalizedRemote, ...lokaleFotos].map((e, i) => ({ ...e, position: i }))
-                : normalizedRemote;
-            datenInListeSchreiben(zuSchreiben);
-            try { speichernLokal(zuSchreiben); } catch (_) {}
+            datenInListeSchreiben(normalizedRemote);
+            lokalMitBasisSpeichern(normalizedRemote);
             authStatusSetzen("Liste von anderem Geraet aktualisiert.");
+        } else if (!syncBasisLaden()) {
+            syncBasisSetzen(normalizedRemote);
         }
 
         lastSyncAt = formatTimeIso(new Date());
@@ -499,41 +550,14 @@ async function refreshFromRemoteIfChanged() {
 
 async function laden() {
     const lokaleDaten = ladenLokal();
+    datenInListeSchreiben(lokaleDaten);
 
     if (!supabaseClient) {
         syncStatusSetzen("Sync: Lokal", "offline");
         syncDebugAktualisieren();
-        datenInListeSchreiben(lokaleDaten);
         return;
     }
-
-    try {
-        const remoteDaten = await ladenRemote();
-        if (remoteDaten && remoteDaten.length > 0) {
-            datenInListeSchreiben(remoteDaten);
-            speichernLokal(remoteDaten);
-            localDirty = false;
-            syncStatusSetzen("Sync: Verbunden", "ok");
-            lastSyncAt = formatTimeIso(new Date());
-            syncDebugAktualisieren();
-            return;
-        }
-
-        datenInListeSchreiben(lokaleDaten);
-        if (lokaleDaten.length > 0) void syncRemoteIfNeeded();
-        else {
-            localDirty = false;
-            syncStatusSetzen("Sync: Verbunden", "ok");
-            syncDebugAktualisieren();
-        }
-    } catch (err) {
-        console.warn("Remote-Laden fehlgeschlagen, nutze lokale Daten:", err, formatSupabaseError(err));
-        syncStatusSetzen("Sync: Offline (lokal)", "offline");
-        authStatusSetzen(syncFehlerHinweis(err));
-        syncDebugAktualisieren();
-        datenInListeSchreiben(lokaleDaten);
-        localDirty = true;
-    }
+    await syncRemoteIfNeeded();
 }
 
 
