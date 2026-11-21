@@ -112,6 +112,9 @@ function syncFehlerHinweis(err) {
     if (message.includes("sync_code_reserved")) {
         return "Code HELP0000 ist reserviert.";
     }
+    if (message.includes("sync_code_not_joined")) {
+        return "Noch nicht mit dem Code verbunden. Lokal wird weiter gespeichert.";
+    }
     if (message.includes("sync_code_not_found")) {
         return "Code nicht gefunden. Bitte pruefen.";
     }

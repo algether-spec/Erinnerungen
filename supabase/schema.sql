@@ -1,3 +1,8 @@
+-- WICHTIG: Nach dem Ausführen dieser Datei IMMER danach
+--   security_1.sql + security_2.sql (Einkaufsliste-Repo, gemeinsame Datenbank)
+--   und supabase/security_3_reminders.sql ausführen.
+-- Diese Datei allein setzt die alten, offenen Zugriffsregeln (Sicherheitslücke)!
+
 do $$
 begin
   if exists (
@@ -402,3 +407,9 @@ grant select, insert, update on public.sync_invites to authenticated;
 -- Fälligkeitsdatum
 alter table public.reminder_items
   add column if not exists due_date date;
+
+-- =============================
+
+-- WEITER MIT: security_1.sql, security_2.sql (Einkaufsliste), danach supabase/security_3_reminders.sql
+
+-- =============================

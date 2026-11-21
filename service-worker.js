@@ -1,8 +1,14 @@
-const CACHE_VERSION = "v1.0.50";
-const CACHE_NAME = "erinnerungen-" + CACHE_VERSION;
+const CACHE_VERSION = "v1.0.55";
+
+// Produktion (/Erinnerungen/), Testversion (/Erinnerungen/dev/) und die
+// Einkaufsliste teilen sich dieselbe Domain und damit denselben CacheStorage
+// → Caches pro Scope trennen und nur eigene alte Caches löschen.
+const IS_DEV_SCOPE = new URL(self.registration.scope).pathname.endsWith("/dev/");
+const CACHE_PREFIX = IS_DEV_SCOPE ? "erinnerungen-dev-" : "erinnerungen-";
+const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
 // Separater Cache ohne Versionsnummer – überlebt SW-Updates.
-const HANDOFF_CACHE = "erinnerungen-handoff";
+const HANDOFF_CACHE = CACHE_PREFIX + "handoff";
 const HANDOFF_KEY = "/__install_context__";
 
 // Im Speicher (geht verloren wenn iOS den SW beendet, daher Cache als Backup)
@@ -30,21 +36,25 @@ const FILES_TO_CACHE = [
 self.addEventListener("install", event => {
   self.skipWaiting();
 
+  // cache: "reload" umgeht den HTTP-Cache – sonst landen evtl. alte Dateien
+  // im Cache der neuen Version.
+  const requests = FILES_TO_CACHE.map(url => new Request(url, { cache: "reload" }));
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES_TO_CACHE))
+      .then(cache => cache.addAll(requests))
   );
 });
+
+// Alte Versions-Caches dieses Scopes (z. B. "erinnerungen-v1.0.49")
+function istAlterVersionsCache(key) {
+  return key.startsWith(CACHE_PREFIX + "v") && key !== CACHE_NAME;
+}
 
 /* ACTIVATE */
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME && key !== HANDOFF_CACHE)
-          .map(key => caches.delete(key))
-      )
+      Promise.all(keys.filter(istAlterVersionsCache).map(key => caches.delete(key)))
     )
   );
   self.clients.claim();

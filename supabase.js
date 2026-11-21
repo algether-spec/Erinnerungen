@@ -174,15 +174,15 @@ async function joinTokenInSupabaseSpeichern(joinToken, rolle, syncCode, options 
     }
 }
 
+// Löst den Token serverseitig ein: liefert Rolle + Code und trägt dieses
+// Gerät als Mitglied ein. Direktes Lesen der Tabelle ist gesperrt.
 async function joinTokenAusSupabaseLaden(joinToken) {
     if (!supabaseClient || !joinToken) return null;
     if (!(await authSicherstellen())) return null;
     try {
-        const { data, error } = await supabaseClient
-            .from("device_join_tokens")
-            .select("rolle, sync_code, expires_at")
-            .eq("join_token", joinToken)
-            .maybeSingle();
+        const { data, error } = await supabaseClient.rpc("redeem_join_token", {
+            p_token: String(joinToken)
+        });
         if (error || !data?.rolle || !data?.sync_code) return null;
         if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null;
         return {
@@ -220,15 +220,15 @@ async function geraetStatusMitJoinTokenRegistrieren(deviceId, joinToken) {
     }
 }
 
+// Löst eine ältere Einladung (#invite=<device_id>) serverseitig ein:
+// liefert den Sync-Code und trägt dieses Gerät als Mitglied ein.
 async function syncCodeAusEinladungLaden(deviceId) {
     if (!supabaseClient || !deviceId) return null;
     if (!(await authSicherstellen())) return null;
     try {
-        const { data, error } = await supabaseClient
-            .from("sync_invites")
-            .select("sync_code")
-            .eq("device_id", deviceId)
-            .single();
+        const { data, error } = await supabaseClient.rpc("redeem_legacy_invite", {
+            p_device_id: String(deviceId)
+        });
         if (error || !data?.sync_code) return null;
         return String(data.sync_code);
     } catch (err) {
@@ -282,6 +282,8 @@ async function syncCodeRpcVerwenden(code, options = {}) {
         p_require_new: requireNew
     });
     if (error) throw error;
+    // Server meldet "Code belegt/unbekannt" als JSON, damit Versuche gezählt werden
+    if (data?.error) throw new Error(String(data.error));
     return data;
 }
 
@@ -295,9 +297,28 @@ async function syncCodeNutzungAktualisieren(code) {
 
 /* --- Erinnerungen Data Operations ------------------------------- */
 
+// Ohne Mitgliedschaft liefert die Datenbank eine LEERE Liste statt eines Fehlers.
+// Das darf nie als "alles gelöscht" gelten → vor jedem Lesen/Schreiben sicherstellen,
+// dass der aktuelle User (kann sich z. B. durch die mit der Einkaufsliste geteilte
+// Anmeldung ändern) Mitglied des Codes ist. Einmal pro User + Code.
+let mitgliedschaftBestaetigt = "";
+
+async function mitgliedschaftSicherstellen() {
+    if (!istGueltigerSyncCode(currentSyncCode) || istReservierterSyncCode(currentSyncCode)) return false;
+    const { data } = await supabaseClient.auth.getSession();
+    const userId = data?.session?.user?.id;
+    if (!userId) return false;
+    const key = `${userId}:${currentSyncCode}`;
+    if (mitgliedschaftBestaetigt === key) return true;
+    await syncCodeRpcVerwenden(currentSyncCode, { allowCreate: true, requireNew: false });
+    mitgliedschaftBestaetigt = key;
+    return true;
+}
+
 async function ladenRemote() {
     if (!supabaseClient) return null;
     if (!(await authSicherstellen())) return null;
+    if (!(await mitgliedschaftSicherstellen())) return null;
 
     const { data, error } = await supabaseClient
         .from(SUPABASE_TABLE)
@@ -321,62 +342,49 @@ async function ladenRemote() {
     }));
 }
 
-async function speichernRemote(daten, options = {}) {
-    const allowRemoteDeletes = options.allowRemoteDeletes === true;
-    if (!supabaseClient) return;
-    if (!(await authSicherstellen())) return;
+async function remoteBereitstellen() {
+    if (!supabaseClient || !(await authSicherstellen())) throw new Error("network offline");
+    if (!(await mitgliedschaftSicherstellen())) throw new Error("SYNC_CODE_NOT_JOINED");
+}
 
-    if (!daten.length) {
-        const { error: deleteAllError } = await supabaseClient
-            .from(SUPABASE_TABLE)
-            .delete()
-            .eq("sync_code", currentSyncCode);
-        if (deleteAllError) throw deleteAllError;
-        return;
-    }
-
-    const payload = daten.map((e, index) => ({
+function eintragAlsZeile(e) {
+    return {
         sync_code: currentSyncCode,
-        item_id: String(e.itemId || "").trim() || generateItemId(),
+        item_id: String(e.itemId),
         text: String(e.text || e.title || ""),
         title: String(e.title || e.text || ""),
         note: String(e.note || ""),
-        erledigt: e.erledigt,
-        position: index,
+        erledigt: Boolean(e.erledigt),
+        position: e.position,
         created_at: normalizeDateIso(e.createdAt) || extractDateFromItemId(e.itemId) || new Date().toISOString(),
         entry_date:
             normalizeDateIso(e.entryDate || e.createdAt)
             || extractDateFromItemId(e.itemId)
             || new Date().toISOString(),
         due_date: e.dueDate ? String(e.dueDate).slice(0, 10) : null
-    }));
+    };
+}
 
-    const { error: upsertError } = await supabaseClient
+// Neue oder geänderte Einträge hochladen
+async function eintraegeHochladen(daten) {
+    if (!daten.length) return;
+    await remoteBereitstellen();
+    const { error } = await supabaseClient
         .from(SUPABASE_TABLE)
-        .upsert(payload, { onConflict: "sync_code,item_id" });
+        .upsert(daten.map(eintragAlsZeile), { onConflict: "sync_code,item_id" });
+    if (error) throw error;
+}
 
-    if (upsertError) throw upsertError;
-
-    if (allowRemoteDeletes) {
-        const localItemIdSet = new Set(payload.map(item => item.item_id));
-        const { data: remoteRows, error: remoteRowsError } = await supabaseClient
-            .from(SUPABASE_TABLE)
-            .select("item_id")
-            .eq("sync_code", currentSyncCode);
-
-        if (remoteRowsError) throw remoteRowsError;
-        const remoteItemIds = (remoteRows || []).map(row => String(row.item_id || "").trim()).filter(Boolean);
-        const obsoleteItemIds = remoteItemIds.filter(itemId => !localItemIdSet.has(itemId));
-
-        if (obsoleteItemIds.length > 0) {
-            const { error: deleteObsoleteError } = await supabaseClient
-                .from(SUPABASE_TABLE)
-                .delete()
-                .eq("sync_code", currentSyncCode)
-                .in("item_id", obsoleteItemIds);
-            if (deleteObsoleteError) throw deleteObsoleteError;
-        }
-    }
+// Nur gezielt die angegebenen Einträge löschen – nie pauschal
+async function eintraegeRemoteLoeschen(itemIds) {
+    if (!itemIds.length) return;
+    await remoteBereitstellen();
+    const { error } = await supabaseClient
+        .from(SUPABASE_TABLE)
+        .delete()
+        .eq("sync_code", currentSyncCode)
+        .in("item_id", itemIds);
+    if (error) throw error;
 }
 
 

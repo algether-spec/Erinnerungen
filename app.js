@@ -68,7 +68,10 @@ autoUpdateEinrichten();
 
 if (supabaseClient) {
     hintergrundSyncStarten();
-    void laden().catch(err => {
+    // Lokale Liste sofort zeigen; Remote erst laden, wenn der Code feststeht –
+    // sonst ist die Mitgliedschaft noch unklar
+    datenInListeSchreiben(ladenLokal());
+    void Promise.resolve(_initPromise).then(() => laden()).catch(err => {
         console.warn("Initiales Laden fehlgeschlagen:", err);
         syncStatusSetzen("Ladefehler – App neu laden", "offline");
     });

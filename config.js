@@ -9,10 +9,12 @@ const APP_CONFIG = window.APP_CONFIG || {};
    KONSTANTEN
 ====================== */
 
-const APP_VERSION = "1.0.50";
+const APP_VERSION = "1.0.55";
 const STORAGE_KEY = "erinnerungen";
 const SUPABASE_TABLE = "reminder_items";
 const SYNC_CODE_KEY = "erinnerungen-sync-code";
+// IDs vom letzten erfolgreichen Abgleich (für Drei-Wege-Abgleich beim Löschen)
+const SYNC_BASIS_KEY = "erinnerungen-sync-basis";
 // Wird NUR bei bewusstem Code-Setzen (URL-Link, Nutzer-Aktion) gespeichert.
 // Auto-generierte Codes überschreiben diesen Key NIEMALS.
 const SYNC_CODE_PERMANENT_KEY = "erinnerungen-sync-code-permanent";
