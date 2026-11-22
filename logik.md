@@ -50,7 +50,9 @@ Verglichen werden drei Stände:
 ### Regeln für die Basis
 
 - Basis wird nur gespeichert, wenn auch die lokale Liste gespeichert werden konnte (`lokalMitBasisSpeichern`, `syncBasisSetzen`)
-- Schlägt `speichernLokal` fehl (z. B. localStorage voll durch Fotos) → Basis wird verworfen (`lokalSpeicherFehler`). Sonst könnte nach einem Neustart ein Eintrag fälschlich als „lokal gelöscht“ gelten und auf dem Server gelöscht werden
+- Schlägt `speichernLokal` fehl (z. B. localStorage voll durch Fotos) → gespeicherte Basis wird verworfen (`lokalSpeicherFehler`). Sonst könnte nach einem Neustart ein Eintrag fälschlich als „lokal gelöscht“ gelten und auf dem Server gelöscht werden
+- Die Kopie im Arbeitsspeicher (`syncBasisImSpeicher`) bleibt – in der laufenden Sitzung ist die Liste im DOM aktuell, der Abgleich funktioniert also weiter
+- Niemals `speichernLokal()` direkt aufrufen, immer `speichern()` (fängt Speicherfehler ab)
 - Ändert der Nutzer während eines Abgleichs etwas, wird die Liste nicht überschrieben; die Basis wird auf die lokal bekannten Einträge gesetzt, die jetzt auf dem Server sind, und der Abgleich läuft erneut
 
 ### Hintergrund-Refresh (`refreshFromRemoteIfChanged`)
@@ -76,6 +78,14 @@ Verglichen werden drei Stände:
 ---
 
 ## Bekannte Bugs & Fixes
+
+### ✅ Fix: Erledigt/Löschen springt zurück bei vielen Fotos (v1.0.58)
+
+**Problem:** Abhaken oder Löschen wurde nach Sekunden rückgängig gemacht – trotz v1.0.57.
+
+**Ursache:** Fotos füllen den localStorage (~5 MB). `sortListByReminderDate()` speicherte selbst per `speichernLokal()` ohne Fehlerbehandlung → `QuotaExceededError` → das anschließende `speichern()` lief nie, die Änderung kam nie auf den Server. Außerdem wurde bei vollem Speicher die Basis verworfen → Abgleich ohne Basis → Server-Stand gewann.
+
+**Fix:** Sortieren speichert nicht mehr selbst (die Aufrufer rufen `speichern()`). Die Basis wird zusätzlich im Arbeitsspeicher gehalten (`syncBasisImSpeicher`) und gilt für die laufende Sitzung auch bei vollem localStorage.
 
 ### ✅ Fix: Erledigt springt zurück auf aktiv (v1.0.57)
 

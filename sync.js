@@ -337,7 +337,11 @@ function listDataSignature(daten) {
 // ob ein fehlender Eintrag gelöscht wurde oder neu ist – und ob ein Eintrag auf
 // diesem Gerät geändert wurde oder nur einen alten Stand hat.
 
+// Kopie im Arbeitsspeicher: gilt für diese Sitzung, auch wenn localStorage voll ist
+let syncBasisImSpeicher = null;
+
 function syncBasisLaden() {
+    if (syncBasisImSpeicher?.code === currentSyncCode) return syncBasisImSpeicher.basis;
     try {
         const raw = JSON.parse(localStorage.getItem(SYNC_BASIS_KEY) || "null");
         if (raw?.code !== currentSyncCode || !Array.isArray(raw.ids)) return null;
@@ -351,6 +355,10 @@ function syncBasisLaden() {
 // Basis nur speichern, wenn auch die lokale Liste gespeichert ist – sonst könnte
 // nach einem Neustart ein Eintrag fälschlich als "lokal gelöscht" gelten.
 function syncBasisSetzen(daten) {
+    syncBasisImSpeicher = {
+        code: currentSyncCode,
+        basis: new Map(daten.map(e => [e.itemId, inhaltPruefsumme(e)]))
+    };
     try {
         if (lokalSpeicherFehler) {
             localStorage.removeItem(SYNC_BASIS_KEY);
