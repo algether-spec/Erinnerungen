@@ -132,7 +132,6 @@ function sortListByReminderDate() {
     }));
 
     datenInListeSchreiben(sortierte);
-    speichernLokal(sortierte);
     return true;
 }
 
