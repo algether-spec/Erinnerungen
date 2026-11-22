@@ -332,15 +332,17 @@ function listDataSignature(daten) {
 }
 
 /* --- Drei-Wege-Abgleich ----------------------------------------- */
-// Basis = IDs, die beim letzten erfolgreichen Abgleich auf dem Server UND in der
-// lokalen Liste waren. Nur damit lässt sich unterscheiden, ob ein fehlender
-// Eintrag gelöscht wurde oder neu ist.
+// Basis = Einträge (ID → Inhalts-Prüfsumme), die beim letzten erfolgreichen Abgleich
+// auf dem Server UND in der lokalen Liste waren. Damit lässt sich unterscheiden,
+// ob ein fehlender Eintrag gelöscht wurde oder neu ist – und ob ein Eintrag auf
+// diesem Gerät geändert wurde oder nur einen alten Stand hat.
 
 function syncBasisLaden() {
     try {
         const raw = JSON.parse(localStorage.getItem(SYNC_BASIS_KEY) || "null");
         if (raw?.code !== currentSyncCode || !Array.isArray(raw.ids)) return null;
-        return new Set(raw.ids);
+        const hashes = raw.hashes || {};
+        return new Map(raw.ids.map(id => [id, hashes[id]]));
     } catch (_) {
         return null;
     }
@@ -355,7 +357,8 @@ function syncBasisSetzen(daten) {
             return;
         }
         const ids = daten.map(e => e.itemId);
-        localStorage.setItem(SYNC_BASIS_KEY, JSON.stringify({ code: currentSyncCode, ids }));
+        const hashes = Object.fromEntries(daten.map(e => [e.itemId, inhaltPruefsumme(e)]));
+        localStorage.setItem(SYNC_BASIS_KEY, JSON.stringify({ code: currentSyncCode, ids, hashes }));
     } catch (_) {}
 }
 
@@ -371,11 +374,30 @@ function lokalMitBasisSpeichern(daten) {
     syncBasisSetzen(daten);
 }
 
+// Kurze Prüfsumme statt Inhalt – Fotos sind mehrere MB groß
+function inhaltPruefsumme(e) {
+    const s = JSON.stringify([e.text, e.title, e.note, e.erledigt, e.dueDate || ""]);
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h.toString(36);
+}
+
+// Lokale Version nur, wenn der Eintrag hier seit dem letzten Abgleich geändert
+// wurde – sonst hat dieses Gerät nur einen alten Stand und der Server gilt
+function aktuelleVersion(lokalEintrag, remoteEintrag, basis) {
+    if (!remoteEintrag) return lokalEintrag;
+    const basisHash = basis.get(lokalEintrag.itemId);
+    const lokalGeaendert = basisHash !== undefined && basisHash !== inhaltPruefsumme(lokalEintrag);
+    return lokalGeaendert ? lokalEintrag : remoteEintrag;
+}
+
 function listenAbgleichen(lokal, remote, basis) {
-    const remoteIds = new Set(remote.map(e => e.itemId));
+    const remoteById = new Map(remote.map(e => [e.itemId, e]));
     const lokalIds = new Set(lokal.map(e => e.itemId));
     // lokal vorhanden: behalten, außer er war schon auf dem Server und ist dort gelöscht
-    const behalten = lokal.filter(e => remoteIds.has(e.itemId) || !basis.has(e.itemId));
+    const behalten = lokal
+        .filter(e => remoteById.has(e.itemId) || !basis.has(e.itemId))
+        .map(e => aktuelleVersion(e, remoteById.get(e.itemId), basis));
     const nurRemote = remote.filter(e => !lokalIds.has(e.itemId));
     const neuRemote = nurRemote.filter(e => !basis.has(e.itemId));
     const loeschen = nurRemote.filter(e => basis.has(e.itemId)).map(e => e.itemId);
@@ -465,10 +487,11 @@ async function einmalAbgleichen() {
 
     // Nutzer hat während des Abgleichs etwas geändert → Liste nicht überschreiben, nochmal.
     // Basis = lokal bekannte Einträge, die jetzt auf dem Server sind (sonst käme ein
-    // gerade hochgeladener und gleich wieder gelöschter Eintrag zurück).
+    // gerade hochgeladener und gleich wieder gelöschter Eintrag zurück) – mit dem
+    // lokalen Inhalt, damit unveränderte Einträge beim nächsten Mal den Server-Stand bekommen.
     if (stand !== lokaleAenderungen) {
-        const lokalIds = new Set(lokal.map(e => e.itemId));
-        syncBasisSetzen(daten.filter(e => lokalIds.has(e.itemId)));
+        const serverIds = new Set(daten.map(e => e.itemId));
+        syncBasisSetzen(lokal.filter(e => serverIds.has(e.itemId)));
         remoteSyncQueued = true;
         return;
     }

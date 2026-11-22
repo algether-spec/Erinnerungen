@@ -32,11 +32,12 @@ Verglichen werden drei Stände:
 
 - **lokal**: die Liste im DOM
 - **remote**: die Zeilen auf dem Server
-- **Basis**: IDs, die beim letzten erfolgreichen Abgleich auf dem Server *und* lokal waren (localStorage `erinnerungen-sync-basis`, gehört zum aktuellen Code)
+- **Basis**: IDs mit Inhalts-Prüfsumme, die beim letzten erfolgreichen Abgleich auf dem Server *und* lokal waren (localStorage `erinnerungen-sync-basis`, gehört zum aktuellen Code)
 
 | lokal | remote | in Basis | Bedeutung | Aktion |
 |---|---|---|---|---|
-| ja | ja | – | vorhanden | lokale Version gilt, hochladen falls geändert |
+| ja | ja | – | lokal seit Basis geändert | lokale Version gilt, hochladen |
+| ja | ja | – | lokal unverändert | Server-Version gilt (anderes Gerät hat evtl. geändert) |
 | ja | nein | nein | lokal neu | hochladen |
 | ja | nein | ja | auf anderem Gerät gelöscht | lokal entfernen |
 | nein | ja | nein | auf anderem Gerät neu | lokal hinzufügen |
@@ -76,6 +77,14 @@ Verglichen werden drei Stände:
 
 ## Bekannte Bugs & Fixes
 
+### ✅ Fix: Erledigt springt zurück auf aktiv (v1.0.57)
+
+**Problem:** Ein Eintrag wurde als erledigt markiert und war kurz danach wieder aktiv.
+
+**Ursache:** Beim Abgleich galt für jeden Eintrag immer die lokale Version. Öffnete sich ein zweites Gerät (oder eine zweite offene Kopie der App) mit altem Stand, überschrieb es das Erledigt wieder mit „aktiv“.
+
+**Fix:** Die Basis speichert pro Eintrag eine Prüfsumme des Inhalts (`inhaltPruefsumme`). Die lokale Version gilt nur, wenn sie seit dem letzten Abgleich auf diesem Gerät geändert wurde (`aktuelleVersion`), sonst die vom Server.
+
 ### ✅ Fix: Gelöschte Einträge kommen zurück (v1.0.54)
 
 **Problem:** Gelöschte Einträge tauchten immer wieder auf, vor allem mit mehreren Geräten oder nach Offline-Löschen.
@@ -92,7 +101,7 @@ Verglichen werden drei Stände:
 
 ### ✅ Fix: Erledigt-Markierung wird nach Sekunden zurückgesetzt (v1.0.45)
 
-Damals: `mergeListConflict()` bevorzugte Remote-Daten. Heute gilt beim Abgleich immer die lokale Version eines Eintrags.
+Damals: `mergeListConflict()` bevorzugte Remote-Daten. Heute gilt eine lokale Änderung immer vor dem Server-Stand.
 
 ---
 
