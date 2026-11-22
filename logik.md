@@ -142,12 +142,14 @@ Der "Update erzwingen"-Button in der App:
 ## Sicherheit (gemeinsame Supabase-Datenbank mit der Einkaufsliste)
 
 - Zugriff auf Einträge nur für Mitglieder eines Codes (`has_sync_membership`)
-- SQL-Skripte im Supabase SQL-Editor ausführen (nichts markieren, komplett ausführen):
-  1. `security_1.sql` (Einkaufsliste-Repo) – ist bereits aktiv
-  2. `security_3_reminders.sql` – **erst nach Merge von v1.0.54 zu main**
-  3. `security_2.sql` (Einkaufsliste-Repo) – erst wenn beide Apps auf main sind
-- `security_3_reminders.sql` prüft sich am Ende selbst und rollt bei Abweichung alles zurück
-- `schema.sql` allein setzt die alten, offenen Regeln → danach immer die security-Skripte ausführen
+- **Stand 22.11.2026: alle drei Skripte sind aktiv** (getestet: Liste, Fotos, zweites Gerät, Teilen-Links beider Apps)
+  1. `security_1.sql` (Einkaufsliste-Repo)
+  2. `security_3_reminders.sql` – `reminder_items` (4 Regeln) und `sync_codes` (keine Regeln, nur über RPCs)
+  3. `security_2.sql` (Einkaufsliste-Repo) – `device_join_tokens`, `sync_invites`, `device_roles` (je 3 Regeln, kein DELETE)
+- Erwarteter Zustand: nur Regeln für `{authenticated}` mit `has_sync_membership`, keine mit `{public}`
+- Beide Skripte löschen zuerst **alle** Regeln ihrer Tabellen (alte offene Regeln mit Leerzeichen im Namen bzw. `shopping_items_*_by_code` waren neben den neuen noch aktiv), prüfen sich am Ende selbst und rollen bei Abweichung alles zurück
+- Ausführen: SQL-Editor → nichts markieren → komplett ausführen; mehrfaches Ausführen ist unschädlich
+- `schema.sql` allein setzt die alten, offenen Regeln → danach immer die security-Skripte erneut ausführen
 
 ---
 
